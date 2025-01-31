@@ -1,4 +1,6 @@
 pub mod ntt;
+#[path = "dft/field.rs"]
+pub mod field;
 
 pub trait DFT<O> {
     fn forward_inplace(&self, x: &mut [O]);

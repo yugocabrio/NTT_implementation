@@ -106,37 +106,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_add() {
-        let q = 5u64;
-        assert_eq!(add(4, 1, q), 0);
-    }
-
-    #[test]
-    fn test_sub() {
-        let q = 5u64;
-        assert_eq!(sub(2, 3, q), 4);
-    }
-
-    #[test]
-    fn test_mul() {
-        let q = 5u64;
-        assert_eq!(mul(2, 3, q), 1);
-    }
-
-    #[test]
-    fn test_exp() {
-        let q = 5u64;
-        assert_eq!(exp(2, 4, q), 1);
-    }
-
-    #[test]
-    fn test_modinv() {
-        let q = 5u64;
-        assert_eq!(inv(4, q), Some(4));
-        assert_eq!(inv(0, q), None);
-    }
-
-    #[test]
     fn test_bitreverse() {
         assert_eq!(bitreverse(6, 3), 3);
     }
