@@ -92,6 +92,15 @@ fn inv(a: u64, m: u64) -> Option<u64> {
     }
 }
 
+fn bitreverse(mut x: usize, log_n: usize) -> usize {
+    let mut y = 0;
+    for _ in 0..log_n {
+        y = (y << 1) | (x & 1);
+        x >>= 1;
+    }
+    y
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +134,10 @@ mod tests {
         let q = 5u64;
         assert_eq!(inv(4, q), Some(4));
         assert_eq!(inv(0, q), None);
+    }
+
+    #[test]
+    fn test_bitreverse() {
+        assert_eq!(bitreverse(6, 3), 3);
     }
 }
