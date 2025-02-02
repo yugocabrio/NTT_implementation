@@ -1,13 +1,13 @@
 /// MongomeryContext
 #[derive(Debug)]
-pub struct MongomeryContext {
+pub struct MontgomeryContext {
     pub m: u64,
     pub r: u64,
     pub n_prime: u64,
     pub k: u32,
 }
 
-impl MongomeryContext {
+impl MontgomeryContext {
     pub fn new(m: u64, k: u32) -> Self {
         // R = 2^k
         let r = 1u64 << k;
@@ -19,7 +19,27 @@ impl MongomeryContext {
         let m_inv_mod_r = inv_mod_u64(m, r).expect("must invert under 2^k");
         let n_prime = r.wrapping_sub(m_inv_mod_r);
 
-        MongomeryContext {m, r, n_prime, k }
+        MontgomeryContext {m, r, n_prime, k }
+    }
+
+    pub fn mont_reduce(&self, t: u128) -> u64 {
+        // R=2^k, mask = R -1 = 2^k - 1は、下位kビットが全部1
+        let mask = self.r.wrapping_sub(1);
+        // T mod R
+        let t_mod_r = (t as u64) & mask;
+
+        let u = (t_mod_r as u128).wrapping_mul(self.n_prime as u128) & (mask as u128);
+        // tmpがrの倍数
+        let tmp = t.wrapping_add(u.wrapping_mul(self.m as u128));
+
+        // (tmp / 2^k)
+        // Rの1回の割り算に相当
+        let big = tmp >> self.k;
+        let mut res = big as u64;
+        if res >= self.m {
+            res -= self.m;
+        }
+        res
     }
 }
 
@@ -73,7 +93,7 @@ mod tests {
     #[test]
     fn test_montgomery_context_new_basic() {
         // m=17, k=5 => r=32
-        let ctx = MongomeryContext::new(17, 5);
+        let ctx = MontgomeryContext::new(17, 5);
         assert_eq!(ctx.m, 17);
         assert_eq!(ctx.r, 32);
 
