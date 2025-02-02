@@ -41,6 +41,17 @@ impl MontgomeryContext {
         }
         res
     }
+
+    /// to_mont(x): x -> (x*R) mod m
+    pub fn to_mont(&self, x: u64) -> u64 {
+        let xr = (x as u128).wrapping_mul(self.r as u128);
+        (xr % (self.m as u128)) as u64
+    }
+
+    /// from_mont(X): X -> (X / R) mod m
+    pub fn from_mont(&self, x: u64) -> u64 {
+        self.mont_reduce(x as u128)
+    }
 }
 
 /// モンテゴメリのmの逆元を求めるため
@@ -100,6 +111,18 @@ mod tests {
         let expected_m_inv = inv_mod_u64(17, 32).unwrap();
         let expected_n_prime = 32u64.wrapping_sub(expected_m_inv);
         assert_eq!(ctx.n_prime, expected_n_prime);
+    }
+
+    #[test]
+    fn test_to_mont_from_mont() {
+        let ctx = MontgomeryContext::new(17, 5);
+        // 10*32 mod17=14
+        let x_mont = ctx.to_mont(10); 
+        assert_eq!(x_mont, 14);
+
+        // 10 mod17
+        let back = ctx.from_mont(x_mont);
+        assert_eq!(back, 10);
     }
 
     #[test]
