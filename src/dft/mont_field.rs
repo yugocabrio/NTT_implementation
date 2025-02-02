@@ -54,6 +54,38 @@ impl MontgomeryContext {
     }
 }
 
+/// (mont_x*mont_y)/R mod m
+pub fn mont_mul(mont_x: u64, mont_y: u64, ctx: &MontgomeryContext) -> u64 {
+    let t = (mont_x as u128) * (mont_y as u128);
+    ctx.mont_reduce(t)
+}
+
+/// (mont_x+mont_y) mod m
+pub fn mont_add(mont_x: u64, mont_y: u64, ctx: &MontgomeryContext) -> u64 {
+    let s = mont_x.wrapping_add(mont_y);
+    if s >= ctx.m { s - ctx.m } else { s }
+}
+
+/// (mont_x-mont_y) mod m
+pub fn mont_sub(mont_x: u64, mont_y: u64, ctx: &MontgomeryContext) -> u64 {
+    if mont_x >= mont_y {mont_x - mont_y } else { mont_x + (ctx.m - mont_y) }
+}
+
+/// (mont_base^exp) mod m
+pub fn mont_exp(mont_base: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
+    let mut result = ctx.to_mont(1);
+    let mut cur = mont_base;
+    let mut e = exp;
+    while e > 0 {
+        if (e & 1) == 1 {
+            result = mont_mul(result, cur, ctx);
+        }
+        cur = mont_mul(cur, cur, ctx);
+        e >>= 1;
+    }
+    result
+}
+
 /// モンテゴメリのmの逆元を求めるため
 fn inv_mod_u64(a: u64, m: u64) -> Option<u64> {
     // gcd(a, m)とx,yを拡張ユークリッドで求める
@@ -101,6 +133,9 @@ fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
+    use crate::dft::field::exp as naive_field_exp;
+
     #[test]
     fn test_montgomery_context_new_basic() {
         // m=17, k=5 => r=32
@@ -144,4 +179,91 @@ mod tests {
         assert_eq!(inv_mod_u64(6, 12), None);
     }
     
+    #[test]
+    fn test_mont_mul() {
+        // m = 17, k = 5, R = 32
+        let ctx = MontgomeryContext::new(17, 5);
+        let a = 3;
+        let b = 5;
+        let a_mont = ctx.to_mont(a); 
+        let b_mont = ctx.to_mont(b);
+
+        // (3*5)%17=15
+        let c_mont = mont_mul(a_mont, b_mont, &ctx);
+        let c = ctx.from_mont(c_mont);
+
+        assert_eq!(c, (a * b) % 17);
+    }
+
+    #[test]
+    fn test_mont_add() {
+        let ctx = MontgomeryContext::new(17, 5);
+
+        let a = 12;
+        let b = 4;
+        let a_mont = ctx.to_mont(a);
+        let b_mont = ctx.to_mont(b);
+
+        let c_mont = mont_add(a_mont, b_mont, &ctx);
+        let c = ctx.from_mont(c_mont);
+
+        assert_eq!(c, (a + b) % 17);
+    }
+
+    #[test]
+    fn test_mont_sub() {
+        let ctx = MontgomeryContext::new(17, 5);
+
+        let x = 12;
+        let y = 4;
+        let x_m = ctx.to_mont(x);
+        let y_m = ctx.to_mont(y);
+
+        let diff_m = mont_sub(x_m, y_m, &ctx);
+        let diff_val = ctx.from_mont(diff_m);
+
+        // (12 - 4) mod 17 = 8
+        assert_eq!(diff_val, (x + 17 - y) % 17);
+    }
+
+    #[test]
+    fn test_mont_exp() {
+        let ctx = MontgomeryContext::new(17, 5);
+
+        let base = 3;
+        let exp = 4;
+
+        // 3^4=81 = 81%17=13
+        let mont_base = ctx.to_mont(base);
+        let mont_c = mont_exp(mont_base, exp, &ctx);
+        let c = ctx.from_mont(mont_c);
+
+        assert_eq!(c, 13);
+    }
+
+    #[test]
+    fn test_mont_exp_vs_field_exp() {
+        const big_q: u64 = 0x1fffffffffe00001;
+        // 2^62 > big_k
+        const k: u32 = 62;
+
+        let ctx = MontgomeryContext::new(big_q, k);
+
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..10 {
+            let base = rng.gen_range(1..big_q);
+            let exp = rng.gen_range(0..100000);
+
+            // naive field exp
+            let field_res = naive_field_exp(base, exp, big_q);
+
+            // mont_exp
+            let mont_base = ctx.to_mont(base);
+            let mont_res = mont_exp(mont_base, exp, &ctx);
+            let montgomery_res = ctx.from_mont(mont_res);
+
+            assert_eq!(montgomery_res, field_res);
+        }
+    }
 }
