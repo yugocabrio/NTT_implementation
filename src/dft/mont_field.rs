@@ -66,3 +66,39 @@ fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
 
     (r0, s0, t0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_montgomery_context_new_basic() {
+        // m=17, k=5 => r=32
+        let ctx = MongomeryContext::new(17, 5);
+        assert_eq!(ctx.m, 17);
+        assert_eq!(ctx.r, 32);
+
+        let expected_m_inv = inv_mod_u64(17, 32).unwrap();
+        let expected_n_prime = 32u64.wrapping_sub(expected_m_inv);
+        assert_eq!(ctx.n_prime, expected_n_prime);
+    }
+
+    #[test]
+    fn test_extended_gcd() {
+        // gcd = gcd(a,b)
+        // g = a*x + b*y
+        let (gcd, x, y) = extended_gcd(30, 18);
+        assert_eq!(gcd, 6);
+        assert_eq!(30*x + 18*y, 6);
+    }
+
+    #[test]
+    fn test_inv_mod_u64() {
+        // a=5, m=17 => 5^-1 mod 17=7 (5*7=35≡1 mod 17)
+        let inv = inv_mod_u64(5, 17).unwrap();
+        assert_eq!((5 * inv) % 17, 1);
+
+        // gcd(6,12)=6=>逆元なし
+        assert_eq!(inv_mod_u64(6, 12), None);
+    }
+    
+}
