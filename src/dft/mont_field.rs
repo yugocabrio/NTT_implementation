@@ -55,26 +55,26 @@ impl MontgomeryContext {
 }
 
 /// (mont_x*mont_y)/R mod m
-pub fn mont_mul(mont_x: u64, mont_y: u64, ctx: &MontgomeryContext) -> u64 {
-    let t = (mont_x as u128) * (mont_y as u128);
+pub fn mont_mul(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
+    let t = (x_mont as u128) * (y_mont as u128);
     ctx.mont_reduce(t)
 }
 
 /// (mont_x+mont_y) mod m
-pub fn mont_add(mont_x: u64, mont_y: u64, ctx: &MontgomeryContext) -> u64 {
-    let s = mont_x.wrapping_add(mont_y);
+pub fn mont_add(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
+    let s = x_mont.wrapping_add(y_mont);
     if s >= ctx.m { s - ctx.m } else { s }
 }
 
 /// (mont_x-mont_y) mod m
-pub fn mont_sub(mont_x: u64, mont_y: u64, ctx: &MontgomeryContext) -> u64 {
-    if mont_x >= mont_y {mont_x - mont_y } else { mont_x + (ctx.m - mont_y) }
+pub fn mont_sub(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
+    if x_mont >= y_mont {x_mont - y_mont } else { x_mont + (ctx.m - y_mont) }
 }
 
 /// (mont_base^exp) mod m
-pub fn mont_exp(mont_base: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
+pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
     let mut result = ctx.to_mont(1);
-    let mut cur = mont_base;
+    let mut cur = base_mont;
     let mut e = exp;
     while e > 0 {
         if (e & 1) == 1 {
@@ -84,6 +84,16 @@ pub fn mont_exp(mont_base: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
         e >>= 1;
     }
     result
+}
+
+/// mont_a^(m-2) mod m (Fermat)
+pub fn mont_inv(x_mont: u64, ctx: &MontgomeryContext) -> Option<u64> {
+    if x_mont == 0 {
+        return None;
+    }
+    let exp = ctx.m.wrapping_sub(2);
+    let resutl = mont_exp(x_mont, exp, ctx);
+    Some(resutl)
 }
 
 /// モンテゴメリのmの逆元を求めるため
@@ -132,6 +142,8 @@ fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
 
 #[cfg(test)]
 mod tests {
+    use std::result;
+
     use super::*;
     use rand::Rng;
     use crate::dft::field::exp as naive_field_exp;
@@ -183,31 +195,31 @@ mod tests {
     fn test_mont_mul() {
         // m = 17, k = 5, R = 32
         let ctx = MontgomeryContext::new(17, 5);
-        let a = 3;
-        let b = 5;
-        let a_mont = ctx.to_mont(a); 
-        let b_mont = ctx.to_mont(b);
+        let x = 3;
+        let y = 5;
+        let x_mont = ctx.to_mont(x); 
+        let y_mont = ctx.to_mont(y);
 
         // (3*5)%17=15
-        let c_mont = mont_mul(a_mont, b_mont, &ctx);
-        let c = ctx.from_mont(c_mont);
+        let z_mont = mont_mul(x_mont, y_mont, &ctx);
+        let z = ctx.from_mont(z_mont);
 
-        assert_eq!(c, (a * b) % 17);
+        assert_eq!(z, (x * y) % 17);
     }
 
     #[test]
     fn test_mont_add() {
         let ctx = MontgomeryContext::new(17, 5);
 
-        let a = 12;
-        let b = 4;
-        let a_mont = ctx.to_mont(a);
-        let b_mont = ctx.to_mont(b);
+        let x = 12;
+        let y = 4;
+        let x_mont = ctx.to_mont(x);
+        let y_mont = ctx.to_mont(y);
 
-        let c_mont = mont_add(a_mont, b_mont, &ctx);
-        let c = ctx.from_mont(c_mont);
+        let z_mont = mont_add(x_mont, y_mont, &ctx);
+        let z = ctx.from_mont(z_mont);
 
-        assert_eq!(c, (a + b) % 17);
+        assert_eq!(z, (x + y) % 17);
     }
 
     #[test]
@@ -216,14 +228,14 @@ mod tests {
 
         let x = 12;
         let y = 4;
-        let x_m = ctx.to_mont(x);
-        let y_m = ctx.to_mont(y);
+        let x_mont = ctx.to_mont(x);
+        let y_mont = ctx.to_mont(y);
 
-        let diff_m = mont_sub(x_m, y_m, &ctx);
-        let diff_val = ctx.from_mont(diff_m);
+        let z_mont = mont_sub(x_mont, y_mont, &ctx);
+        let z = ctx.from_mont(z_mont);
 
         // (12 - 4) mod 17 = 8
-        assert_eq!(diff_val, (x + 17 - y) % 17);
+        assert_eq!(z, (x + 17 - y) % 17);
     }
 
     #[test]
@@ -234,15 +246,31 @@ mod tests {
         let exp = 4;
 
         // 3^4=81 = 81%17=13
-        let mont_base = ctx.to_mont(base);
-        let mont_c = mont_exp(mont_base, exp, &ctx);
-        let c = ctx.from_mont(mont_c);
+        let base_mont = ctx.to_mont(base);
+        let result_mont = mont_exp(base_mont, exp, &ctx);
+        let result = ctx.from_mont(result_mont);
 
-        assert_eq!(c, 13);
+        assert_eq!(result, 13);
     }
 
     #[test]
-    fn test_mont_exp_vs_field_exp() {
+    fn test_mont_inv() {
+        let ctx = MontgomeryContext::new(17, 5);
+
+        // inverse of 5 is 7
+        let x_mont = ctx.to_mont(5);
+        let result_mont = mont_inv(x_mont, &ctx).expect("must have inverse");
+        let result = ctx.from_mont(result_mont);
+
+        assert_eq!((5 * result) % 17, 1);
+
+        // inverse of 0
+        let x_mont = ctx.to_mont(0);
+        assert_eq!(mont_inv(x_mont, &ctx), None);
+    }
+
+    #[test]
+    fn test_mont_exp_and_naive_field_exp() {
         const big_q: u64 = 0x1fffffffffe00001;
         // 2^62 > big_k
         const k: u32 = 62;
@@ -259,9 +287,9 @@ mod tests {
             let field_res = naive_field_exp(base, exp, big_q);
 
             // mont_exp
-            let mont_base = ctx.to_mont(base);
-            let mont_res = mont_exp(mont_base, exp, &ctx);
-            let montgomery_res = ctx.from_mont(mont_res);
+            let base_mont = ctx.to_mont(base);
+            let res_mont = mont_exp(base_mont, exp, &ctx);
+            let montgomery_res = ctx.from_mont(res_mont);
 
             assert_eq!(montgomery_res, field_res);
         }
