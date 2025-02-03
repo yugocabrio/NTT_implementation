@@ -51,47 +51,6 @@ impl Table<u64> {
     pub fn backward_inplace_core<const LAZY: bool>(&self, a: &mut [u64]) {}
 }
 
-/// (a + b) mod m
-fn add(a: u64, b: u64, m: u64) -> u64 {
-    let add_num = a + b;
-    if add_num >= m { add_num - m } else { add_num }
-}
-
-/// (a - b) mod m
-fn sub(a: u64, b: u64, m: u64) -> u64 {
-    if a >= b { a - b } else { a + m - b }
-}
-
-/// (a * b) mod m
-fn mul(a: u64, b: u64, m:u64) -> u64 {
-    let mul_num = (a as u128) * (b as u128);
-    (mul_num % (m as u128)) as u64
-}
-
-/// a^b mod m
-fn exp(base: u64, exp: u64, m: u64) -> u64 {
-    let mut exp_num  = 1u64;
-    let mut current_base = base % m;
-    let mut e = exp;
-    while e > 0 {
-        if (e & 1) == 1 {
-            exp_num = mul(exp_num, current_base, m);
-        }
-        current_base = mul(current_base, current_base, m);
-        e >>= 1;
-    }
-    exp_num
-}
-
-/// a^(m-2) mod m, Fermat's theorem
-fn inv(a: u64, m: u64) -> Option<u64> {
-    if a == 0 {
-        None
-    } else {
-        Some(exp(a, m-2, m))
-    }
-}
-
 fn bitreverse(mut x: usize, log_n: usize) -> usize {
     let mut y = 0;
     for _ in 0..log_n {
