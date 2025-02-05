@@ -5,9 +5,11 @@ pub struct MontgomeryContext {
     pub r: u64,
     pub n_prime: u64,
     pub k: u32,
+    pub mask: u64,
 }
 
 impl MontgomeryContext {
+    #[inline]
     pub fn new(m: u64, k: u32) -> Self {
         // R = 2^k
         let r = 1u64 << k;
@@ -18,17 +20,25 @@ impl MontgomeryContext {
         // n' = -m^-1 mod R
         let m_inv_mod_r = inv_mod_u64(m, r).expect("must invert under 2^k");
         let n_prime = r.wrapping_sub(m_inv_mod_r);
+        // mask = R - 1
+        let mask = r.wrapping_sub(1);
 
-        MontgomeryContext {m, r, n_prime, k }
+        MontgomeryContext {
+            m,
+            r,
+            n_prime,
+            k,
+            mask,
+        }
     }
 
+    #[inline(always)]
     pub fn mont_reduce(&self, t: u128) -> u64 {
         // R=2^k, mask = R -1 = 2^k - 1は、下位kビットが全部1
-        let mask = self.r.wrapping_sub(1);
         // T mod R
-        let t_mod_r = (t as u64) & mask;
+        let t_mod_r = (t as u64) & self.mask;
 
-        let u = (t_mod_r as u128).wrapping_mul(self.n_prime as u128) & (mask as u128);
+        let u = (t_mod_r as u128).wrapping_mul(self.n_prime as u128) & (self.mask as u128);
         // tmpがrの倍数
         let tmp = t.wrapping_add(u.wrapping_mul(self.m as u128));
 
@@ -37,41 +47,56 @@ impl MontgomeryContext {
         let big = tmp >> self.k;
         let mut res = big as u64;
         if res >= self.m {
-            res -= self.m;
+            res = res.wrapping_sub(self.m);
         }
         res
     }
 
-    /// to_mont(x): x -> (x*R) mod m
+    /// x -> (x*R) mod m
+    #[inline(always)]
     pub fn to_mont(&self, x: u64) -> u64 {
         let xr = (x as u128).wrapping_mul(self.r as u128);
         (xr % (self.m as u128)) as u64
     }
 
-    /// from_mont(X): X -> (X / R) mod m
+    /// x -> (x/R) mod m
+    #[inline(always)]
     pub fn from_mont(&self, x: u64) -> u64 {
         self.mont_reduce(x as u128)
     }
 }
 
-/// (mont_x*mont_y)/R mod m
+/// (mont_x * mont_y) / R mod m
+#[inline(always)]
 pub fn mont_mul(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let t = (x_mont as u128) * (y_mont as u128);
     ctx.mont_reduce(t)
 }
 
 /// (mont_x+mont_y) mod m
+#[inline(always)]
 pub fn mont_add(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let s = x_mont.wrapping_add(y_mont);
-    if s >= ctx.m { s - ctx.m } else { s }
+    if s >= ctx.m {
+        s.wrapping_sub(ctx.m)
+    } else {
+        s
+    }
 }
 
 /// (mont_x-mont_y) mod m
+#[inline(always)]
 pub fn mont_sub(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
-    if x_mont >= y_mont {x_mont - y_mont } else { x_mont + (ctx.m - y_mont) }
+    let d = x_mont.wrapping_sub(y_mont);
+    if x_mont < y_mont {
+        d.wrapping_add(ctx.m)
+    } else {
+        d
+    }
 }
 
 /// (mont_base^exp) mod m
+#[inline(always)]
 pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
     let mut result = ctx.to_mont(1);
     let mut cur = base_mont;
@@ -87,16 +112,18 @@ pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
 }
 
 /// mont_a^(m-2) mod m (Fermat)
+#[inline]
 pub fn mont_inv(x_mont: u64, ctx: &MontgomeryContext) -> Option<u64> {
     if x_mont == 0 {
         return None;
     }
     let exp = ctx.m.wrapping_sub(2);
-    let resutl = mont_exp(x_mont, exp, ctx);
-    Some(resutl)
+    let result_mont = mont_exp(x_mont, exp, ctx);
+    Some(result_mont)
 }
 
 /// モンテゴメリのmの逆元を求めるため
+#[inline]
 fn inv_mod_u64(a: u64, m: u64) -> Option<u64> {
     // gcd(a, m)とx,yを拡張ユークリッドで求める
     // aが逆元を求めたい
@@ -117,6 +144,7 @@ fn inv_mod_u64(a: u64, m: u64) -> Option<u64> {
 }
 
 /// gcd(a, b) = a*s0 + b*t0, 最終的に (gcd, si, ti) を返す
+#[inline]
 fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
     let (mut s0, mut s1) = (1, 0);
     let (mut t0, mut t1) = (0, 1);
@@ -136,14 +164,11 @@ fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
         t0 = t1;
         t1 = next_t;
     }
-
     (r0, s0, t0)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::result;
-
     use super::*;
     use rand::Rng;
     use crate::dft::field::exp as naive_field_exp;
