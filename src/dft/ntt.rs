@@ -5,6 +5,7 @@ use crate::dft::mont_field::{
 use crate::dft::field::{
     mul as field_mul, exp as field_exp, inv as field_inv
 };
+use rand::Rng;
 
 pub struct Table{
     /// NTT friendly prime
@@ -29,21 +30,61 @@ pub struct Table{
 
 impl Table {
     pub fn new() -> Self {
+        let q = 0x1fffffffffe00001u64;
+        let n =  1<<16;
+        let psi =  0x15eb043c7aa2b01fu64; //2^17th root of unity
+        let psi_inv = field_inv(psi, q).expect("cannot calc invere of psi");
+
+        let (fwd_twid, inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
+
+        let k: u32 = 62;
+        let mont = MontgomeryContext::new(q, k);
+        let n_mont = mont.to_mont(n as u64);
+        let inv_n = mont_inv(n_mont, &mont).expect("cannot calc inverse of n");
+
         Self {
-            q: 0x1fffffffffe00001u64,
-            n: 0,
-            psi: 0x15eb043c7aa2b01fu64, //2^17th root of unity
-            psi_inv: 0,
-            fwd_twid: vec![],
-            inv_twid: vec![],
-            inv_n: 0,
-            mont: MontgomeryContext::new(1, 1),
+            q, 
+            n,
+            psi,
+            psi_inv,
+            fwd_twid,
+            inv_twid,
+            inv_n,
+            mont,
         }
     }
 
     /// dynamic params
-    pub fn with_params(_q: u64, _n: usize) -> Option<Self> {
-        None
+    pub fn with_params(q: u64, n: usize) -> Option<Self> {
+        if !n.is_power_of_two() {
+            return None;
+        }
+        if (q - 1) % (2 * n as u64) != 0 {
+            return None;
+        }
+
+        // find psi
+        let (psi, psi_inv) = find_primitive_2nth_root_of_unity(q, n)?;
+
+        let (fwd_twid, inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
+
+        let k: u32 = 62;
+        if q >= (1u64 << k) {
+            return None;
+        }
+        let mont = MontgomeryContext::new(q, k);
+        let n_mont = mont.to_mont(n as u64);
+        let inv_n = mont_inv(n_mont, &mont)?;
+
+        Some(Self {
+            q, n,
+            psi,
+            psi_inv,
+            fwd_twid,
+            inv_twid,
+            inv_n,
+            mont,
+        })
     }
 
     /// query the prime field
@@ -107,16 +148,31 @@ fn build_bitrev_tables(_q: u64, _n: usize, _psi: u64, _psi_inv: u64) -> (Vec<u64
 }
 
 // dynamic paramの探索
-fn find_2n_root_of_unity(_q: u64, _n: usize) -> Option<(u64,u64)> {
-    None
-}
+fn find_primitive_2nth_root_of_unity(q: u64, n: usize) -> Option<(u64,u64)> {
+    let mut rng = rand::thread_rng();
 
-fn gcd(_a:u64, _b:u64)->u64 {
-    1
-}
-fn is_generator_candidate(_g:u64,_q:u64)->bool {
-    false
-}
-fn factorize_small(_x: &mut u64)->Vec<u64>{
-    vec![]
+    // 2n = 2 * n
+    let two_n = 2*(n as u64);
+    if (q - 1) % two_n != 0 {
+        return None;
+    }
+    let exponent = (q - 1) / two_n;
+
+    loop {
+        let x_random = rng.gen_range(1..q);
+
+        let g = field_exp(x_random, exponent, q);
+
+        if n > 1 {
+            let check_half = field_exp(g, (n/2) as u64, q);
+            if check_half != 1 {
+                let g_inv = field_inv(g, q)?;
+                return Some((g, g_inv));
+            }
+        }
+        else {
+            break;
+        }
+    }
+    None
 }
