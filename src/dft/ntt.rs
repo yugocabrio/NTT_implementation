@@ -140,8 +140,6 @@ impl Default for Table {
     }
 }
 
-
-
 // twidの定義
 fn build_bitrev_tables(_q: u64, _n: usize, _psi: u64, _psi_inv: u64) -> (Vec<u64>, Vec<u64>) {
     (vec![], vec![])
@@ -175,4 +173,31 @@ fn find_primitive_2nth_root_of_unity(q: u64, n: usize) -> Option<(u64,u64)> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dft::DFT;
+    use crate::dft::field::{
+        add as field_add, sub as field_sub, mul as field_mul, exp as field_exp
+    };
+    use rand::thread_rng;
+    use rand::Rng;
+
+    #[test]
+    fn test_find_primitive_2n_root_of_unity() {
+        let q = 7681u64;
+        let n = 16; 
+        // 2n=32
+        // (q-1)=7680 は 2n=32を割り切る => 7680/32=240
+    
+        let got = find_primitive_2nth_root_of_unity(q, n);
+        assert!(got.is_some(), "should be able to find 2n-th root for (7681,16)");
+        let (g, g_inv) = got.unwrap();
+    
+        let inv_check = field_mul(g, g_inv, q);
+        assert_eq!(inv_check, 1, "g*g_inv != 1");
+    }
+    
 }
