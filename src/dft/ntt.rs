@@ -141,8 +141,28 @@ impl Default for Table {
 }
 
 // twidの定義
-fn build_bitrev_tables(_q: u64, _n: usize, _psi: u64, _psi_inv: u64) -> (Vec<u64>, Vec<u64>) {
-    (vec![], vec![])
+///   forward_table[i] = psi^(bit-reverse(i))
+///   inverse_table[i] = psi_inv^(bit-reverse(i))
+fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>) {
+    let log_n = n.trailing_zeros();
+    let mut fwd = vec![0u64; n];
+    let mut inv = vec![0u64; n];
+
+    let mut power_psi = 1u64;
+    let mut power_psi_inv = 1u64;
+
+    for i in 0..n {
+        let r = (i as u32).reverse_bits() >> (32 - log_n);
+        let ridx = r as usize;
+
+        fwd[ridx] = power_psi;
+        inv[ridx] = power_psi_inv;
+
+        // (psi^(i+1)), (psi_inv^(i+1))
+        power_psi = field_mul(power_psi_inv, psi, q);
+        power_psi_inv = field_mul(power_psi_inv, psi, q);
+    }
+    (fwd, inv)
 }
 
 // dynamic paramの探索
@@ -193,7 +213,7 @@ mod tests {
         // (q-1)=7680 は 2n=32を割り切る => 7680/32=240
     
         let got = find_primitive_2nth_root_of_unity(q, n);
-        assert!(got.is_some(), "should be able to find 2n-th root for (7681,16)");
+        assert!(got.is_some(), "found");
         let (g, g_inv) = got.unwrap();
     
         let inv_check = field_mul(g, g_inv, q);
