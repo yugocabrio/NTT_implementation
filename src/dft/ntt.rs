@@ -35,10 +35,18 @@ impl Table {
         let psi =  0x15eb043c7aa2b01fu64; //2^17th root of unity
         let psi_inv = field_inv(psi, q).expect("cannot calc invere of psi");
 
-        let (fwd_twid, inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
+        let (mut fwd_twid, mut inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
 
         let k: u32 = 62;
         let mont = MontgomeryContext::new(q, k);
+
+        for x in fwd_twid.iter_mut() {
+            *x = mont.to_mont(*x);
+        }
+        for x in inv_twid.iter_mut() {
+            *x = mont.to_mont(*x);
+        }
+
         let n_mont = mont.to_mont(n as u64);
         let inv_n = mont_inv(n_mont, &mont).expect("cannot calc inverse of n");
 
@@ -66,13 +74,21 @@ impl Table {
         // find psi
         let (psi, psi_inv) = find_primitive_2nth_root_of_unity(q, n)?;
 
-        let (fwd_twid, inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
+        let (mut fwd_twid, mut inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
 
         let k: u32 = 62;
         if q >= (1u64 << k) {
             return None;
         }
         let mont = MontgomeryContext::new(q, k);
+
+        for x in fwd_twid.iter_mut() {
+            *x = mont.to_mont(*x);
+        }
+        for x in inv_twid.iter_mut() {
+            *x = mont.to_mont(*x);
+        }
+
         let n_mont = mont.to_mont(n as u64);
         let inv_n = mont_inv(n_mont, &mont)?;
 
@@ -108,7 +124,7 @@ impl Table {
             for i in 0..m {
                 let j1 = 2 * i * t;
                 let j2 = j1 + t - 1;
-                let s_mont = self.mont.to_mont(self.fwd_twid[m + i]);
+                let s_mont = self.fwd_twid[m + i];
                 for j in j1..=j2 {
                     let u = a[j];
                     let v = mont_mul(a[j + t], s_mont, &self.mont);
@@ -136,7 +152,7 @@ impl Table {
             for i in 0..h {
                 let j1 = 2 * i * t;
                 let j2 = j1 + t - 1;
-                let s_mont = self.mont.to_mont(self.inv_twid[h + i]);
+                let s_mont = self.inv_twid[h + i];
                 for j in j1..=j2 {
                     let u = a[j];
                     let v = a[j + t];
