@@ -29,6 +29,7 @@ pub struct MontTable{
 }
 
 impl MontTable {
+    #[inline(always)]
     pub fn new() -> Self {
         let q = 0x1fffffffffe00001u64;
         let n =  1<<16;
@@ -62,7 +63,7 @@ impl MontTable {
         }
     }
 
-    /// dynamic params
+    #[inline(always)]
     pub fn with_params(q: u64, n: usize) -> Option<Self> {
         if !n.is_power_of_two() {
             return None;
@@ -103,17 +104,20 @@ impl MontTable {
         })
     }
 
+    #[inline(always)]
     /// query the prime field
     pub fn q(&self) -> u64 {
         self.q
     }
 
+    #[inline(always)]
     /// query the n
     pub fn size(&self) -> usize {
         self.n
     }
 
-    pub fn forward_inplace_core<const LAZY: bool>(&self, a: &mut [u64]) {
+    #[inline(always)]
+    pub fn forward_inplace(&self, a: &mut [u64]) {
         for x in a.iter_mut() {
             *x = self.mont.to_mont(*x);
         }
@@ -141,7 +145,8 @@ impl MontTable {
         }
     }
 
-    pub fn backward_inplace_core<const LAZY: bool>(&self, a: &mut [u64]) {
+    #[inline(always)]
+    pub fn backward_inplace(&self, a: &mut [u64]) {
         for x in a.iter_mut() {
             *x = self.mont.to_mont(*x);
         }
@@ -176,38 +181,27 @@ impl MontTable {
 
 
 impl DFT<u64> for MontTable {
+    #[inline(always)]
     /// NTT forward routine
     ///
     /// - `a`: vector with each element in range `[0, q)`
     fn forward_inplace(&self, a: &mut [u64]) {
-        self.forward_inplace_core::<false>(a)
+        self.forward_inplace(a);
     }
 
-    /// NTT forward lazy routine
-    ///
-    /// - `a`: vector with each element in range `[0, 2q)`
-    fn forward_inplace_lazy(&self, a: &mut [u64]) {
-        self.forward_inplace_core::<true>(a)
-    }
-
+    #[inline(always)]
     /// NTT backward routine
     ///
     /// - `a`: vector with each element in range `[0, q)`
     fn backward_inplace(&self, a: &mut [u64]) {
-        self.backward_inplace_core::<false>(a)
-    }
-
-    /// NTT backward lazy routine
-    ///
-    /// - `a`: vector with each element in range `[0, 2q)`
-    fn backward_inplace_lazy(&self, a: &mut [u64]) {
-        self.backward_inplace_core::<true>(a)
+        self.backward_inplace(a);
     }
 }
 
 // twidの定義
 ///   forward_table[i] = psi^(bit-reverse(i))
 ///   inverse_table[i] = psi_inv^(bit-reverse(i))
+#[inline(always)]
 fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>) {
     let log_n = n.trailing_zeros();
     let mut fwd = vec![0u64; n];
@@ -231,6 +225,7 @@ fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, V
 }
 
 // dynamic paramの探索
+#[inline(always)]
 fn find_primitive_2nth_root_of_unity(q: u64, n: usize) -> Option<(u64,u64)> {
     let mut rng = rand::thread_rng();
 

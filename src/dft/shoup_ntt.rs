@@ -3,7 +3,6 @@ use crate::dft::DFT;
 use crate::dft::field::{mul as field_mul, inv as field_inv, exp as field_exp, add as field_add, sub as field_sub};
 use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
 
-/// Shoup 方式での NTT テーブル
 pub struct ShoupTable {
     /// NTT-friendly prime
     q: u64,
@@ -23,6 +22,7 @@ pub struct ShoupTable {
 }
 
 impl ShoupTable {
+    #[inline]
     pub fn new() -> Self {
         let q = 0x1fffffffffe00001u64;
         let n = 1 << 16;
@@ -46,6 +46,7 @@ impl ShoupTable {
     }
 
     /// dynamic params
+    #[inline]
     pub fn with_params(q: u64, n: usize) -> Option<Self> {
         if !n.is_power_of_two() {
             return None;
@@ -74,65 +75,80 @@ impl ShoupTable {
     }
 
     /// query the prime field
+    #[inline(always)]
     pub fn q(&self) -> u64 {
         self.q
     }
 
     /// query the n
+    #[inline(always)]
     pub fn size(&self) -> usize {
         self.n
     }
 
-    pub fn forward_inplace_core<const LAZY: bool>(&self, a: &mut [u64]) {
+    #[inline(always)]
+    pub fn forward_inplace(&self, a: &mut [u64]) {
         let q = self.q;
-        let mut t = self.n;
-        let mut m = 1;
-        while m < self.n {
-            t >>= 1;
-            for i in 0..m {
-                let (w, w_shoup) = self.fwd_twid[m + i];
-                let j1 = 2*i*t;
-                let j2 = j1 + t - 1;
-                for j in j1..=j2 {
-                    let u = a[j];
-                    let v = shoup_mul(a[j + t], (w, w_shoup), q);
+        let mut half = self.n;
+        let mut step = 1;
+        while step < self.n {
+            half >>= 1;
+            for i in 0..step {
+                let (w, w_shoup) = self.fwd_twid[step + i];
+                let base = 2 * i * half; // j1
+                let end = base + half;   // j2+1
+  
+                for j in base..end {
+                    let u = unsafe { *a.get_unchecked(j) };
+                    let tv = unsafe { *a.get_unchecked(j + half) };
+                    let v = shoup_mul(tv, (w, w_shoup), q);
+
                     let sum_ = field_add(u, v, q);
                     let diff_ = field_sub(u, v, q);
-                    a[j] = sum_;
-                    a[j + t] = diff_;
+
+                    unsafe {
+                        *a.get_unchecked_mut(j) = sum_;
+                        *a.get_unchecked_mut(j + half) = diff_;
+                    }
                 }
             }
-            m <<= 1;
+            step <<= 1;
         }
     }
 
-    pub fn backward_inplace_core<const LAZY: bool>(&self, a: &mut [u64]) {
+    #[inline(always)]
+    pub fn backward_inplace(&self, a: &mut [u64]) {
         let q = self.q;
-        let mut t = 1;
-        let mut m = self.n;
-        while m > 1 {
-            let h = m >> 1;
-            for i in 0..h {
-                let (w, w_shoup) = self.inv_twid[h + i];
-                let j1 = 2*i*t;
-                let j2 = j1 + t - 1;
-                for j in j1..=j2 {
-                    let u = a[j];
-                    let v = a[j + t];
+        let (inv_n_val, inv_n_shoup) = self.inv_n;
+
+        let mut step = self.n;
+        let mut half = 1;
+        while step > 1 {
+            let halfstep = step >> 1;
+            for i in 0..halfstep {
+                let (w, w_shoup) = self.inv_twid[halfstep + i];
+                let base = 2 * i * half;
+                let end = base + half;
+                for j in base..end {
+                    let u = unsafe { *a.get_unchecked(j) };
+                    let v = unsafe { *a.get_unchecked(j + half) };
+
                     let sum_ = field_add(u, v, q);
                     let diff_ = field_sub(u, v, q);
                     let diff_m = shoup_mul(diff_, (w, w_shoup), q);
-                    a[j] = sum_;
-                    a[j + t] = diff_m;
+
+                    unsafe {
+                        *a.get_unchecked_mut(j) = sum_;
+                        *a.get_unchecked_mut(j + half) = diff_m;
+                    }
                 }
             }
-            t <<= 1;
-            m = h;
+            half <<= 1;
+            step = halfstep;
         }
 
         // multiply by inv_n
-        let (inv_n_val, inv_n_shoup) = self.inv_n;
-        for x in a {
+        for x in a.iter_mut() {
             *x = shoup_mul(*x, (inv_n_val, inv_n_shoup), q);
         }
     }
@@ -142,33 +158,22 @@ impl DFT<u64> for ShoupTable {
     /// NTT forward routine
     ///
     /// - `a`: vector with each element in range `[0, q)`
+    #[inline(always)]
     fn forward_inplace(&self, a: &mut [u64]) {
-        self.forward_inplace_core::<false>(a)
-    }
-
-    /// NTT forward lazy routine
-    ///
-    /// - `a`: vector with each element in range `[0, 2q)`
-    fn forward_inplace_lazy(&self, a: &mut [u64]) {
-        self.forward_inplace_core::<true>(a)
+        self.forward_inplace(a);
     }
 
     /// NTT backward routine
     ///
     /// - `a`: vector with each element in range `[0, q)`
+    #[inline(always)]
     fn backward_inplace(&self, a: &mut [u64]) {
-        self.backward_inplace_core::<false>(a)
-    }
-
-    /// NTT backward lazy routine
-    ///
-    /// - `a`: vector with each element in range `[0, 2q)`
-    fn backward_inplace_lazy(&self, a: &mut [u64]) {
-        self.backward_inplace_core::<true>(a)
+        self.backward_inplace(a);
     }
 }
 
 // twidの定義
+#[inline]
 fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u64)>, Vec<(u64,u64)>) {
     let log_n = n.trailing_zeros();
     let mut fwd = vec![(0u64,0u64); n];
@@ -191,6 +196,7 @@ fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u6
 }
 
 // dynamic paramの探索
+#[inline]
 fn find_primitive_2nth_root_of_unity(q: u64, n: usize) -> Option<(u64,u64)> {
     let mut rng = rand::thread_rng();
 
