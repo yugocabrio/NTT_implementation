@@ -281,7 +281,7 @@ mod tests {
         let q = 7681u64;
         let n = 16usize;
         let table = Table::with_params(q, n)
-            .expect("cannot build Table for q=7681, n=16");
+            .expect("cannot build");
     
         let mut rng = thread_rng();
         let mut data = vec![0u64; n];
@@ -394,4 +394,32 @@ mod tests {
 
         assert_eq!(a, result_naive);
     }
+
+    /// a(x) = 1 + 10x + 20x^2 + 3x^3
+    /// b(x) = 5 +  6x +  7x^2 + 11x^3
+    ///
+    /// x^4 + 1 で割るnegacyclic乗算
+    /// c = [28, 9, 37, 22] (mod 97)
+    #[test]
+    fn test_ntt_polymul_small_prime_evaluation() {
+        let q = 97u64;
+        let n = 4usize;
+
+        let table = Table::with_params(q, n)
+            .expect("cannot build");
+
+        let mut a = vec![1u64, 10, 20, 3];
+        let mut b = vec![5u64,  6,  7, 11];
+        let expected = vec![28u64, 9, 37, 22];
+
+        table.forward_inplace(&mut a);
+        table.forward_inplace(&mut b);
+        for i in 0..n {
+            a[i] = field_mul(a[i], b[i], q);
+        }
+        table.backward_inplace(&mut a);
+
+        assert_eq!(a, expected);
+    }
+
 }
