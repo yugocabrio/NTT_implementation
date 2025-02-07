@@ -277,6 +277,26 @@ mod tests {
     }
 
     #[test]
+    fn forward_backward_small_prime() {
+        let q = 7681u64;
+        let n = 16usize;
+        let table = Table::with_params(q, n)
+            .expect("cannot build Table for q=7681, n=16");
+    
+        let mut rng = thread_rng();
+        let mut data = vec![0u64; n];
+        for x in data.iter_mut() {
+            *x = rng.gen_range(0..q);
+        }
+        let orig = data.clone();
+    
+        table.forward_inplace(&mut data);
+        table.backward_inplace(&mut data);
+    
+        assert_eq!(data, orig);
+    }    
+    
+    #[test]
     fn forward_backward_default(){
         let table=Table::new();
         let q=table.q();
@@ -287,8 +307,8 @@ mod tests {
             *x=rng.gen_range(0..q);
         }
         let orig=data.clone();
-        table.forward_inplace_lazy(&mut data);
-        table.backward_inplace_lazy(&mut data);
+        table.forward_inplace(&mut data);
+        table.backward_inplace(&mut data);
         assert_eq!(data,orig);
     }
 
