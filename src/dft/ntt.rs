@@ -312,4 +312,90 @@ mod tests {
         assert_eq!(data,orig);
     }
 
+    /// c(x) = a(x)*b(x) (mod x^n + 1).
+    /// (i + j >= n) のとき、c[(i+j) - n] にマイナスを加える
+    pub fn negacyclic_mult(a: &[u64], b: &[u64], q: u64) -> Vec<u64> {
+        let n = a.len();
+        let mut c = vec![0u64; n];
+
+        for i in 0..n {
+            for j in 0..n {
+                // index = i + j
+                let idx = i + j;
+                let product = field_mul(a[i], b[j], q);
+
+                if idx < n {
+                    // c[idx] += a[i]*b[j]
+                    c[idx] = field_add(c[idx], product, q);
+                } else {
+                    // c[idx - n] -= a[i]*b[j]
+                    let wrapped_idx = idx - n;
+                    c[wrapped_idx] = field_sub(c[wrapped_idx], product, q);
+                }
+            }
+        }
+
+        c
+    }
+
+    #[test]
+    fn test_ntt_polymul_small_prime() {
+        let q = 7681u64;
+        let n = 8usize;
+
+        let table = Table::with_params(q, n)
+            .expect("error");
+
+        let mut rng = rand::thread_rng();
+        let mut a = vec![0u64; n];
+        let mut b = vec![0u64; n];
+        for i in 0..n {
+            a[i] = rng.gen_range(0..q);
+            b[i] = rng.gen_range(0..q);
+        }
+
+        let mut a_ntt = a.clone();
+        let mut b_ntt = b.clone();
+        table.forward_inplace(&mut a_ntt);
+        table.forward_inplace(&mut b_ntt);
+
+        for i in 0..n {
+            a_ntt[i] = field_mul(a_ntt[i], b_ntt[i], q);
+        }
+
+        table.backward_inplace(&mut a_ntt);
+        let c_via_ntt = a_ntt;
+
+        let c_naive = negacyclic_mult(&a, &b, q);
+
+        assert_eq!(c_via_ntt, c_naive);
+    }
+
+    #[test]
+    #[ignore]
+    fn polynomial_mul_default_ntt(){
+        let table=Table::new();
+        let q=table.q();
+        let n=table.size();
+        let mut rng=thread_rng();
+        let mut a=vec![0u64;n];
+        let mut b=vec![0u64;n];
+        for i in 0..n{
+            a[i]=rng.gen_range(0..q);
+            b[i]=rng.gen_range(0..q);
+        }
+        let mut a_ntt = a.clone();
+        let mut b_ntt = b.clone();
+        table.forward_inplace(&mut a_ntt);
+        table.forward_inplace(&mut b_ntt);
+
+        for i in 0..n {
+            a_ntt[i] = field_mul(a_ntt[i], b_ntt[i], q);
+        }
+        table.backward_inplace(&mut a_ntt);
+        let c_via_ntt = a_ntt;
+
+        let c_naive = negacyclic_mult(&a, &b, q);
+        assert_eq!(c_via_ntt,c_naive);
+    }
 }
