@@ -3,7 +3,7 @@ use criterion::{
 };
 use rand::Rng;
 use app::dft::DFT;
-use app::dft::ntt::Table as MontTable;
+use app::dft::mont_ntt::MontTable;
 use concrete_ntt::prime64;
 
 const PRIME: u64 = 0x1fffffffffe00001;

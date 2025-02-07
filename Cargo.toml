@@ -5,13 +5,14 @@ edition = "2021"
 
 [dependencies]
 criterion = "0.5.1"
+concrete-ntt = "0.2.0"
 rand = "0.8"
 
 [[bench]]
 name = "ntt"
+path = "benches/ntt.rs"
 harness = false
 
 [[bench]]
 name = "field_bench"
-harness = false
 path = "benches/field_bench.rs"

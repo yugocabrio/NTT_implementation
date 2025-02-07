@@ -1,21 +1,25 @@
 /// (a + b) mod m
+#[inline(always)]
 pub fn add(a: u64, b: u64, m: u64) -> u64 {
     let add_num = a + b;
     if add_num >= m { add_num - m } else { add_num }
 }
 
 /// (a - b) mod m
+#[inline(always)]
 pub fn sub(a: u64, b: u64, m: u64) -> u64 {
     if a >= b { a - b } else { a + m - b }
 }
 
 /// (a * b) mod m
-pub fn mul(a: u64, b: u64, m:u64) -> u64 {
+#[inline(always)]
+pub fn mul(a: u64, b: u64, m: u64) -> u64 {
     let mul_num = (a as u128) * (b as u128);
     (mul_num % (m as u128)) as u64
 }
 
 /// a^b mod m
+#[inline]
 pub fn exp(base: u64, exp: u64, m: u64) -> u64 {
     let mut exp_num  = 1u64;
     let mut current_base = base % m;
@@ -31,6 +35,7 @@ pub fn exp(base: u64, exp: u64, m: u64) -> u64 {
 }
 
 /// a^(m-2) mod m, Fermat's theorem
+#[inline]
 pub fn inv(a: u64, m: u64) -> Option<u64> {
     if a == 0 {
         None
