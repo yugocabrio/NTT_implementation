@@ -338,6 +338,12 @@ mod tests {
         c
     }
 
+    fn point_multiply(a:&mut[u64],b:&mut[u64],q:u64){
+        for i in 0..a.len(){
+            a[i]=field_mul(a[i],b[i],q);
+        }
+    }
+
     #[test]
     fn test_ntt_polymul_small_prime() {
         let q = 7681u64;
@@ -354,48 +360,38 @@ mod tests {
             b[i] = rng.gen_range(0..q);
         }
 
-        let mut a_ntt = a.clone();
-        let mut b_ntt = b.clone();
-        table.forward_inplace(&mut a_ntt);
-        table.forward_inplace(&mut b_ntt);
+        let result_naive = negacyclic_mult(&a, &b, q);
 
-        for i in 0..n {
-            a_ntt[i] = field_mul(a_ntt[i], b_ntt[i], q);
-        }
+        table.forward_inplace(&mut a);
+        table.forward_inplace(&mut b);
+        point_multiply(&mut a, &mut b, q);
+        table.backward_inplace(&mut a);
 
-        table.backward_inplace(&mut a_ntt);
-        let c_via_ntt = a_ntt;
-
-        let c_naive = negacyclic_mult(&a, &b, q);
-
-        assert_eq!(c_via_ntt, c_naive);
+        assert_eq!(a, result_naive);
     }
 
     #[test]
     #[ignore]
-    fn polynomial_mul_default_ntt(){
-        let table=Table::new();
+    fn test_ntt_polymul_default() {
+        let table = Table::new();
         let q=table.q();
         let n=table.size();
-        let mut rng=thread_rng();
-        let mut a=vec![0u64;n];
-        let mut b=vec![0u64;n];
-        for i in 0..n{
-            a[i]=rng.gen_range(0..q);
-            b[i]=rng.gen_range(0..q);
-        }
-        let mut a_ntt = a.clone();
-        let mut b_ntt = b.clone();
-        table.forward_inplace(&mut a_ntt);
-        table.forward_inplace(&mut b_ntt);
 
+        let mut rng = rand::thread_rng();
+        let mut a = vec![0u64; n];
+        let mut b = vec![0u64; n];
         for i in 0..n {
-            a_ntt[i] = field_mul(a_ntt[i], b_ntt[i], q);
+            a[i] = rng.gen_range(0..q);
+            b[i] = rng.gen_range(0..q);
         }
-        table.backward_inplace(&mut a_ntt);
-        let c_via_ntt = a_ntt;
 
-        let c_naive = negacyclic_mult(&a, &b, q);
-        assert_eq!(c_via_ntt,c_naive);
+        let result_naive = negacyclic_mult(&a, &b, q);
+
+        table.forward_inplace(&mut a);
+        table.forward_inplace(&mut b);
+        point_multiply(&mut a, &mut b, q);
+        table.backward_inplace(&mut a);
+
+        assert_eq!(a, result_naive);
     }
 }
