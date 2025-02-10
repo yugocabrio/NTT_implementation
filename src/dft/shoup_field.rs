@@ -1,4 +1,3 @@
-
 /// b_shoup = floor((w << 64) / q) とし、(w, b_shoup)
 #[inline(always)]
 pub fn shoup_precompute(w: u64, q: u64) -> (u64, u64) {
@@ -20,4 +19,12 @@ pub fn shoup_mul(a: u64, (b, b_shoup): (u64, u64), q: u64) -> u64 {
 
     let ret = tmp as u64;
     if ret >= q { ret - q } else { ret }
+}
+
+#[test]
+fn test_shoup_mul() {
+    let q = 5u64;
+    let b_tuple = shoup_precompute(3, q);
+    let shoup_res  = shoup_mul(2, b_tuple, q);
+    assert_eq!(shoup_res, 1);
 }
