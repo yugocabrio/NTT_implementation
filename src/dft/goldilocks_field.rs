@@ -7,35 +7,37 @@ pub const GOLDILOCKS_P: u64 = 0xFFFF_FFFF_0000_0001;
 ///   r = t0 + t1 (+ carry分 * (2^32 - 1)) を p で一度だけ減算
 #[inline(always)]
 pub fn reduce128(x: u128) -> u64 {
-    let lo = x as u64;
-    let hi = (x >> 64) as u64;
+    const EPSILON: u64 = (1 << 32) - 1;
 
-    let a = hi >> 32;
-    let b = hi & 0xFFFF_FFFF;
-    let c = lo;
+    let x_lo = x as u64;    // x0～x1
+    let x_hi = (x >> 64) as u64; // x2～x3
 
-    // 2^96 = -1
-    let mut t = (c as i128) - (a as i128);
-    if t < 0 {
-        t += GOLDILOCKS_P as i128;
+    // x3, x2の取り出し
+    let x3 = x_hi >> 32;
+    let x2 = x_hi & EPSILON;
+
+    // t0 = x0 - x3 (borrow が発生したら t0 -= (2^32 - 1))
+    let (mut t0, borrow) = x_lo.overflowing_sub(x3);
+    if borrow {
+        t0 = t0.wrapping_sub(EPSILON);
     }
-    let r = t as u64;
 
-    // 2^64 = 2^32 - 1
-    let add_part = ((b as u128) << 32).wrapping_sub(b as u128);
-    let big = (r as u128).wrapping_add(add_part);
+    // t1 = x2 * (2^32 - 1)
+    let t1 = x2.wrapping_mul(EPSILON);
 
-    let mut r2 = big as u64;
-    let carry = big >> 64;
-    if carry != 0 {
-        r2 = r2.wrapping_sub(GOLDILOCKS_P);
+    // t0 + t1 を計算し、オーバーフロー(carry)を検知
+    let (res_wrapped, carry) = t0.overflowing_add(t1);
+
+    // carryがあると(2^32 - 1)を追加
+    let mut r = res_wrapped.wrapping_add(EPSILON * (carry as u64));
+
+    // ここで一度だけpで減算
+    if r >= GOLDILOCKS_P {
+        r -= GOLDILOCKS_P;
     }
-    if r2 >= GOLDILOCKS_P {
-        r2 -= GOLDILOCKS_P;
-    }
-    r2
+
+    r
 }
-
 /// (a*b mod p)
 #[inline(always)]
 pub fn mul_mod(a: u64, b: u64) -> u64 {
