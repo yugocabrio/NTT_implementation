@@ -1,46 +1,52 @@
-/// (a + b) mod m
+/// (a + b) mod p
 #[inline(always)]
-pub fn add(a: u64, b: u64, m: u64) -> u64 {
-    let add_num = a + b;
-    if add_num >= m { add_num - m } else { add_num }
+pub fn add(a: u64, b: u64, p: u64) -> u64 {
+    let (res, carry) = a.overflowing_add(b);
+    let mut s = res;
+    if carry || s >= p {
+        s = s.wrapping_sub(p);
+    }
+    s
 }
 
-/// (a - b) mod m
+/// (a - b) mod p
 #[inline(always)]
-pub fn sub(a: u64, b: u64, m: u64) -> u64 {
-    if a >= b { a - b } else { a + m - b }
+pub fn sub(a: u64, b: u64, p: u64) -> u64 {
+    if a >= b {
+        a - b
+    } else {
+        a.wrapping_sub(b).wrapping_add(p)
+    }
 }
 
-/// (a * b) mod m
+/// (a * b) mod p
 #[inline(always)]
-pub fn mul(a: u64, b: u64, m: u64) -> u64 {
-    let mul_num = (a as u128) * (b as u128);
-    (mul_num % (m as u128)) as u64
+pub fn mul(a: u64, b: u64, p: u64) -> u64 {
+    ((a as u128) * (b as u128) % (p as u128)) as u64
 }
 
-/// a^b mod m
-#[inline]
-pub fn exp(base: u64, exp: u64, m: u64) -> u64 {
-    let mut exp_num  = 1u64;
-    let mut current_base = base % m;
-    let mut e = exp;
+/// a^e mod p
+#[inline(always)]
+pub fn exp(mut base: u64, mut e: u64, p: u64) -> u64 {
+    let mut r = 1u64;
+    base = base % p;
     while e > 0 {
-        if (e & 1) == 1 {
-            exp_num = mul(exp_num, current_base, m);
+        if (e & 1) != 0 {
+            r = mul(r, base, p);
         }
-        current_base = mul(current_base, current_base, m);
+        base = mul(base, base, p);
         e >>= 1;
     }
-    exp_num
+    r
 }
 
-/// a^(m-2) mod m, Fermat's theorem
-#[inline]
-pub fn inv(a: u64, m: u64) -> Option<u64> {
+/// a^(p-2) mod p, Fermat
+#[inline(always)]
+pub fn inv(a: u64, p: u64) -> Option<u64> {
     if a == 0 {
         None
     } else {
-        Some(exp(a, m-2, m))
+        Some(exp(a, p - 2, p))
     }
 }
 
@@ -73,7 +79,7 @@ mod tests {
     }
 
     #[test]
-    fn test_modinv() {
+    fn test_inv() {
         let q = 5u64;
         assert_eq!(inv(4, q), Some(4));
         assert_eq!(inv(0, q), None);
