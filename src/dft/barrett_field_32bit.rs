@@ -82,30 +82,39 @@ mod tests {
     fn test_add() {
         let p = 5u32;
         assert_eq!(add(4, 1, p), 0);
+        assert_eq!(add(p-1, 1, p), 0);
+        assert_eq!(add(0,3,p), 3);
     }
 
     #[test]
     fn test_sub() {
         let p = 5u32;
         assert_eq!(sub(2, 3, p), 4);
+        assert_eq!(sub(p-1, p-1, p), 0);
+        assert_eq!(sub(0,0,p), 0);
     }
 
     #[test]
     fn test_mul() {
         let p = 5u32;
         assert_eq!(mul(2,3,p), 1);
+        assert_eq!(mul(p-1,p-1,p), 1);
+        assert_eq!(mul(0,3,p),0);
     }
 
     #[test]
     fn test_exp() {
         let p = 5u32;
         assert_eq!(exp(2,4,p), 1);
+        assert_eq!(exp(3,3,p), 2);
     }
 
     #[test]
     fn test_inv() {
         let p= 5u32;
         assert_eq!(inv(4, p), Some(4));
+        assert_eq!(inv(0, p), None);
+        assert_eq!(inv(1, p), Some(1));
     }
 
     #[test]
@@ -113,7 +122,13 @@ mod tests {
         let p=13u32;
         let p_bar= barrett_precompute(p);
         let b_tuple= (4u32,0);
-        let barrett_res= barrett_mul(5, b_tuple, p, p_bar);
-        assert_eq!(barrett_res as u64, 7);
+        let r0= barrett_mul(5, b_tuple, p, p_bar);
+        assert_eq!(r0 as u64, 7);
+
+        let r1 = barrett_mul(p-1, (p-1,0), p, p_bar);
+        assert_eq!(r1 as u64, 1);
+
+        let r2= barrett_mul(0, (4,0), p, p_bar);
+        assert_eq!(r2, 0);
     }
 }

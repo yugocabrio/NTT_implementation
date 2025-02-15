@@ -56,32 +56,40 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let q = 5u64;
-        assert_eq!(add(4, 1, q), 0);
+        let p= 5u64;
+        assert_eq!(add(4, 1, p), 0);
+        assert_eq!(add(p-1,1,p), 0);
+        assert_eq!(add(0,3,p), 3);
     }
 
     #[test]
     fn test_sub() {
-        let q = 5u64;
-        assert_eq!(sub(2, 3, q), 4);
+        let p= 5u64;
+        assert_eq!(sub(2, 3, p), 4);
+        assert_eq!(sub(p-1,p-1,p),0);
+        assert_eq!(sub(0,0,p),0);
     }
 
     #[test]
     fn test_mul() {
-        let q = 5u64;
-        assert_eq!(mul(2, 3, q), 1);
+        let p= 5u64;
+        assert_eq!(mul(2,3,p), 1);
+        assert_eq!(mul(p-1,p-1,p), 1);
+        assert_eq!(mul(0,3,p),0);
     }
 
     #[test]
     fn test_exp() {
-        let q = 5u64;
-        assert_eq!(exp(2, 4, q), 1);
+        let p= 5u64;
+        assert_eq!(exp(2,4,p), 1);
+        assert_eq!(exp(3,3,p), 2);
     }
 
     #[test]
     fn test_inv() {
-        let q = 5u64;
-        assert_eq!(inv(4, q), Some(4));
-        assert_eq!(inv(0, q), None);
+        let p= 5u64;
+        assert_eq!(inv(4,p), Some(4));
+        assert_eq!(inv(0,p), None);
+        assert_eq!(inv(1,p), Some(1));
     }
 }

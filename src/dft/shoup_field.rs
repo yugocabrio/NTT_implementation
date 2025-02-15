@@ -21,10 +21,28 @@ pub fn shoup_mul(a: u64, (b, b_shoup): (u64, u64), p: u64) -> u64 {
     if ret >= p { ret - p } else { ret }
 }
 
-#[test]
-fn test_shoup_mul() {
-    let p = 13u64;
-    let b_tuple = shoup_precompute(5, p);
-    let shoup_res  = shoup_mul(4,  b_tuple, p);
-    assert_eq!(shoup_res, 7);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shoup_mul() {
+        let p= 13u64;
+        let b_tuple= shoup_precompute(5, p);
+        let shoup_res= shoup_mul(4, b_tuple, p);
+        assert_eq!(shoup_res, 7);
+
+    
+        let (bw, bw_sh)= shoup_precompute(p-1, p);
+        let r= shoup_mul(p-1, (bw,bw_sh), p);
+        assert_eq!(r, 1);
+        
+        let (bw,bw_sh)= shoup_precompute(3, p);
+        let r0= shoup_mul(0, (bw,bw_sh), p);
+        assert_eq!(r0, 0);
+
+        let (b0,b0_sh)= shoup_precompute(0, p);
+        let r1= shoup_mul(7, (b0,b0_sh), p);
+        assert_eq!(r1, 0);
+    }
 }
