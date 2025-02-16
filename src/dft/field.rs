@@ -1,22 +1,16 @@
-/// (a + b) mod p
+/// a+b mod q
 #[inline(always)]
 pub fn add(a: u64, b: u64, p: u64) -> u64 {
-    let (res, carry) = a.overflowing_add(b);
-    let mut s = res;
-    if carry || s >= p {
-        s = s.wrapping_sub(p);
-    }
-    s
+    let c = a.wrapping_add(b);
+    if c >= p { c - p } else { c }
 }
 
-/// (a - b) mod p
+/// a-b mod q
 #[inline(always)]
 pub fn sub(a: u64, b: u64, p: u64) -> u64 {
-    if a >= b {
-        a - b
-    } else {
-        a.wrapping_sub(b).wrapping_add(p)
-    }
+    // a + q - b
+    let c = a.wrapping_add(p).wrapping_sub(b);
+    if c >= p { c - p } else { c }
 }
 
 /// (a * b) mod p
@@ -29,7 +23,6 @@ pub fn mul(a: u64, b: u64, p: u64) -> u64 {
 #[inline(always)]
 pub fn exp(mut base: u64, mut e: u64, p: u64) -> u64 {
     let mut r = 1u64;
-    base = base % p;
     while e > 0 {
         if (e & 1) != 0 {
             r = mul(r, base, p);

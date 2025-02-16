@@ -2,6 +2,7 @@ use rand::Rng;
 use crate::dft::DFT;
 use crate::dft::field::{mul, inv, exp, add, sub};
 use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
+use crate::dft::util::{find_primitive_2nth_root_of_unity_64};
 
 pub struct ShoupTable {
     /// NTT-friendly prime
@@ -32,7 +33,7 @@ impl ShoupTable {
         let inv_n_val = inv(n as u64, q).expect("cannot invert n");
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
-        let (mut fwd_twid, mut inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
+        let (mut fwd_twid, mut inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
 
         Self {
             q,
@@ -56,12 +57,12 @@ impl ShoupTable {
         }
 
         // find psi
-        let (psi, psi_inv) = find_primitive_2nth_root_of_unity(q, n)?;
+        let (psi, psi_inv) = find_primitive_2nth_root_of_unity_64(q, n)?;
 
         let inv_n_val = inv(n as u64, q)?;
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
-        let (mut fwd_twid, mut inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
+        let (mut fwd_twid, mut inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
 
         Some(Self {
             q,
@@ -174,7 +175,7 @@ impl DFT<u64> for ShoupTable {
 
 // twidの定義
 #[inline]
-fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u64)>, Vec<(u64,u64)>) {
+fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u64)>, Vec<(u64,u64)>) {
     let log_n = n.trailing_zeros();
     let mut fwd = vec![(0u64,0u64); n];
     let mut inv = vec![(0u64,0u64); n];
@@ -195,38 +196,6 @@ fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u6
     (fwd, inv)
 }
 
-// dynamic paramの探索
-#[inline]
-fn find_primitive_2nth_root_of_unity(q: u64, n: usize) -> Option<(u64,u64)> {
-    let mut rng = rand::thread_rng();
-
-    // 2n = 2 * n
-    let two_n = 2*(n as u64);
-    if (q - 1) % two_n != 0 {
-        return None;
-    }
-    let exponent = (q - 1) / two_n;
-
-    loop {
-        let x_random = rng.gen_range(1..q);
-
-        let g = exp(x_random, exponent, q);
-
-        // g^n == q-1" (≡ -1 mod q)
-        let g_n = exp(g, n as u64, q);
-        if g_n == q.wrapping_sub(1) {
-            // "g^(2n) == 1"
-            let g_2n = exp(g, two_n, q);
-            if g_2n == 1 {
-                if let Some(g_inv) = inv(g, q) {
-                    return Some((g, g_inv));
-                }
-            }
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,27 +205,6 @@ mod tests {
     };
     use rand::thread_rng;
     use rand::Rng;
-
-    #[test]
-    fn test_find_primitive_2n_root_of_unity() {
-        let q = 7681u64;
-        let n = 16; 
-        // 2n=32
-        // (q-1)=7680 は 2n=32を割り切る => 7680/32=240
-    
-        let got = find_primitive_2nth_root_of_unity(q, n);
-        assert!(got.is_some(), "cannot find");
-        let (g, g_inv) = got.unwrap();
-    
-        let inv_check = field_mul(g, g_inv, q);
-        assert_eq!(inv_check, 1, "g*g_inv != 1");
-
-        let g_2n = field_exp(g, (2 * n) as u64, q);
-        assert_eq!(g_2n, 1, "g^(2n) != 1 mod q");
-
-        let g_n = field_exp(g, n as u64, q);
-        assert_ne!(g_n, 1, "g^n == 1 mod q");       
-    }
 
     #[test]
     fn shoup_forward_backward_small_prime() {

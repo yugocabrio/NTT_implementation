@@ -1,5 +1,5 @@
 use crate::dft::DFT;
-use crate::dft::goldilocks_field::{GOLDILOCKS_P, mul, add, sub, inv, pow};
+use crate::dft::goldilocks_field::{GOLDILOCKS_P, mul, add, sub, inv, exp};
 use rand::Rng;
 
 pub struct GoldilocksNttTable {
@@ -118,15 +118,14 @@ pub fn find_primitive_2n_root_of_unity(n: usize) -> Option<(u64, u64)> {
     }
     let exponent = (GOLDILOCKS_P - 1) / two_n;
     let mut rng = rand::thread_rng();
-    const TRIES_LIMIT: usize = 500_000;
 
-    for _ in 0..TRIES_LIMIT {
+    for _ in 0..3000 {
         let x = rng.gen_range(1..GOLDILOCKS_P);
-        let g = pow(x, exponent);
+        let g = exp(x, exponent);
         // g^n = p-1  (≡ -1 mod p) かどうか
-        if pow(g, n as u64) == GOLDILOCKS_P.wrapping_sub(1) {
+        if exp(g, n as u64) == GOLDILOCKS_P.wrapping_sub(1) {
             // かつ g^(2n) = 1
-            if pow(g, 2 * (n as u64)) == 1 {
+            if exp(g, 2 * (n as u64)) == 1 {
                 return Some((g, inv(g)));
             }
         }

@@ -66,7 +66,8 @@ pub fn sub(a: u64, b: u64) -> u64 {
 }
 
 /// (base^exp mod p)
-pub fn pow(mut base: u64, mut exp: u64) -> u64 {
+#[inline(always)]
+pub fn exp(mut base: u64, mut exp: u64) -> u64 {
     let mut result = 1u64;
     while exp > 0 {
         if (exp & 1) != 0 {
@@ -79,8 +80,9 @@ pub fn pow(mut base: u64, mut exp: u64) -> u64 {
 }
 
 /// (a^(p-2) mod p)
+#[inline(always)]
 pub fn inv(a: u64) -> u64 {
-    pow(a, GOLDILOCKS_P - 2)
+    exp(a, GOLDILOCKS_P - 2)
 }
 
 #[cfg(test)]
