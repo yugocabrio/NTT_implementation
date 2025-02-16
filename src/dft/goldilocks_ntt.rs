@@ -1,5 +1,5 @@
 use crate::dft::DFT;
-use crate::dft::goldilocks_field::{GOLDILOCKS_P, mul_mod, add_mod, sub_mod, mod_inv, pow_mod};
+use crate::dft::goldilocks_field::{GOLDILOCKS_P, mul, add, sub, inv, pow};
 use rand::Rng;
 
 pub struct GoldilocksNttTable {
@@ -18,8 +18,8 @@ impl GoldilocksNttTable {
         let q = GOLDILOCKS_P;
         let n = 1 << 16;
         let psi = 0xabd0a6e8aa3d8a0e_u64;
-        let psi_inv = mod_inv(psi);
-        let inv_n = mod_inv(n as u64);
+        let psi_inv = inv(psi);
+        let inv_n = inv(n as u64);
 
         let (fwd_twid, inv_twid) = build_bitrev_tables(n, psi, psi_inv);
         Self { q, n, psi, psi_inv, fwd_twid, inv_twid, inv_n }
@@ -32,7 +32,7 @@ impl GoldilocksNttTable {
         }
         let (psi, psi_inv) = find_primitive_2n_root_of_unity(n)?;
         let (fwd_twid, inv_twid) = build_bitrev_tables(n, psi, psi_inv);
-        let inv_n = mod_inv(n as u64);
+        let inv_n = inv(n as u64);
         Some(Self { q: GOLDILOCKS_P, n, psi, psi_inv, fwd_twid, inv_twid, inv_n })
     }
 
@@ -57,9 +57,9 @@ impl GoldilocksNttTable {
                         let idx = base + j;
                         let u = *a_ptr.add(idx);
                         let tv = *a_ptr.add(idx + half);
-                        let v = mul_mod(tv, w);
-                        *a_ptr.add(idx) = add_mod(u, v);
-                        *a_ptr.add(idx + half) = sub_mod(u, v);
+                        let v = mul(tv, w);
+                        *a_ptr.add(idx) = add(u, v);
+                        *a_ptr.add(idx + half) = sub(u, v);
                     }
                 }
             }
@@ -83,9 +83,9 @@ impl GoldilocksNttTable {
                         let idx = base + j;
                         let u = *a_ptr.add(idx);
                         let v = *a_ptr.add(idx + half);
-                        let sum_ = add_mod(u, v);
-                        let diff_ = sub_mod(u, v);
-                        let diffm = mul_mod(diff_, w);
+                        let sum_ = add(u, v);
+                        let diff_ = sub(u, v);
+                        let diffm = mul(diff_, w);
                         *a_ptr.add(idx) = sum_;
                         *a_ptr.add(idx + half) = diffm;
                     }
@@ -95,7 +95,7 @@ impl GoldilocksNttTable {
             step = halfstep;
         }
         for x in a.iter_mut() {
-            *x = mul_mod(*x, self.inv_n);
+            *x = mul(*x, self.inv_n);
         }
     }
 }
@@ -122,12 +122,12 @@ pub fn find_primitive_2n_root_of_unity(n: usize) -> Option<(u64, u64)> {
 
     for _ in 0..TRIES_LIMIT {
         let x = rng.gen_range(1..GOLDILOCKS_P);
-        let g = pow_mod(x, exponent);
+        let g = pow(x, exponent);
         // g^n = p-1  (≡ -1 mod p) かどうか
-        if pow_mod(g, n as u64) == GOLDILOCKS_P.wrapping_sub(1) {
+        if pow(g, n as u64) == GOLDILOCKS_P.wrapping_sub(1) {
             // かつ g^(2n) = 1
-            if pow_mod(g, 2 * (n as u64)) == 1 {
-                return Some((g, mod_inv(g)));
+            if pow(g, 2 * (n as u64)) == 1 {
+                return Some((g, inv(g)));
             }
         }
     }
@@ -145,8 +145,8 @@ fn build_bitrev_tables(n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>)
         let r = r as usize;
         fwd[r] = cur_f;
         inv[r] = cur_i;
-        cur_f = mul_mod(cur_f, psi);
-        cur_i = mul_mod(cur_i, psi_inv);
+        cur_f = mul(cur_f, psi);
+        cur_i = mul(cur_i, psi_inv);
     }
     (fwd, inv)
 }
@@ -155,7 +155,7 @@ fn build_bitrev_tables(n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>)
 mod tests {
     use super::*;
     use crate::dft::DFT;
-    use crate::dft::goldilocks_field::{mul_mod, add_mod, sub_mod, GOLDILOCKS_P};
+    use crate::dft::goldilocks_field::{mul, add, sub, GOLDILOCKS_P};
     use rand::{thread_rng, Rng};
 
     fn poly_negacyclic_naive(a: &[u64], b: &[u64]) -> Vec<u64> {
@@ -163,13 +163,13 @@ mod tests {
         let mut c = vec![0u64; n];
         for i in 0..n {
             for j in 0..n {
-                let prod = mul_mod(a[i], b[j]);
+                let prod = mul(a[i], b[j]);
                 let idx = i + j;
                 if idx < n {
-                    c[idx] = add_mod(c[idx], prod);
+                    c[idx] = add(c[idx], prod);
                 } else {
                     // x^n = -1
-                    c[idx - n] = sub_mod(c[idx - n], prod);
+                    c[idx - n] = sub(c[idx - n], prod);
                 }
             }
         }
@@ -214,7 +214,7 @@ mod tests {
         table.forward_inplace(&mut fa);
         table.forward_inplace(&mut fb);
         for i in 0..n {
-            fa[i] = mul_mod(fa[i], fb[i]);
+            fa[i] = mul(fa[i], fb[i]);
         }
         table.backward_inplace(&mut fa);
 
@@ -234,7 +234,7 @@ mod tests {
         table.forward_inplace(&mut fa);
         table.forward_inplace(&mut fb);
         for i in 0..4 {
-            fa[i] = mul_mod(fa[i], fb[i]);
+            fa[i] = mul(fa[i], fb[i]);
         }
         table.backward_inplace(&mut fa);
 
@@ -275,12 +275,12 @@ mod tests {
             let mut c = vec![0u64; n];
             for i in 0..n {
                 for j in 0..n {
-                    let prod = mul_mod(a[i], b[j]);
+                    let prod = mul(a[i], b[j]);
                     let idx = i + j;
                     if idx < n {
-                        c[idx] = add_mod(c[idx], prod);
+                        c[idx] = add(c[idx], prod);
                     } else {
-                        c[idx - n] = sub_mod(c[idx - n], prod);
+                        c[idx - n] = sub(c[idx - n], prod);
                     }
                 }
             }
@@ -292,7 +292,7 @@ mod tests {
         table.forward_inplace(&mut fa);
         table.forward_inplace(&mut fb);
         for i in 0..n {
-            fa[i] = mul_mod(fa[i], fb[i]);
+            fa[i] = mul(fa[i], fb[i]);
         }
         table.backward_inplace(&mut fa);
 

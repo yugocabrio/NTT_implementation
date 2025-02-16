@@ -40,13 +40,13 @@ pub fn reduce128(x: u128) -> u64 {
 }
 /// (a*b mod p)
 #[inline(always)]
-pub fn mul_mod(a: u64, b: u64) -> u64 {
+pub fn mul(a: u64, b: u64) -> u64 {
     reduce128((a as u128) * (b as u128))
 }
 
 /// (a+b mod p)
 #[inline(always)]
-pub fn add_mod(a: u64, b: u64) -> u64 {
+pub fn add(a: u64, b: u64) -> u64 {
     let (res, carry) = a.overflowing_add(b);
     let mut sum = res;
     if carry || sum >= GOLDILOCKS_P {
@@ -57,7 +57,7 @@ pub fn add_mod(a: u64, b: u64) -> u64 {
 
 /// (a-b mod p)
 #[inline(always)]
-pub fn sub_mod(a: u64, b: u64) -> u64 {
+pub fn sub(a: u64, b: u64) -> u64 {
     if a >= b {
         a - b
     } else {
@@ -66,21 +66,21 @@ pub fn sub_mod(a: u64, b: u64) -> u64 {
 }
 
 /// (base^exp mod p)
-pub fn pow_mod(mut base: u64, mut exp: u64) -> u64 {
+pub fn pow(mut base: u64, mut exp: u64) -> u64 {
     let mut result = 1u64;
     while exp > 0 {
         if (exp & 1) != 0 {
-            result = mul_mod(result, base);
+            result = mul(result, base);
         }
-        base = mul_mod(base, base);
+        base = mul(base, base);
         exp >>= 1;
     }
     result
 }
 
 /// (a^(p-2) mod p)
-pub fn mod_inv(a: u64) -> u64 {
-    pow_mod(a, GOLDILOCKS_P - 2)
+pub fn inv(a: u64) -> u64 {
+    pow(a, GOLDILOCKS_P - 2)
 }
 
 #[cfg(test)]
@@ -100,7 +100,7 @@ mod tests {
     fn test_add_mod() {
         let a = GOLDILOCKS_P - 13;
         let b = 13u64;
-        let s = add_mod(a, b);
+        let s = add(a, b);
         assert_eq!(s, 0);
     }
 
@@ -109,7 +109,7 @@ mod tests {
         // 0 - 1 = p-1
         let a = 0u64;
         let b = 111u64;
-        let d = sub_mod(a, b);
+        let d = sub(a, b);
         assert_eq!(d, GOLDILOCKS_P - 111);
     }
 
@@ -117,7 +117,7 @@ mod tests {
     fn test_mul_mod() {
         // (p-1)*(p-1) = p^2 -2p +1 ≡ 1 (mod p)
         let a = GOLDILOCKS_P - 1;
-        let m = mul_mod(a, a);
+        let m = mul(a, a);
         assert_eq!(m, 1);
     }
 
@@ -125,8 +125,8 @@ mod tests {
     fn test_mod_inv() {
         // a*(a^-1) ≡ 1
         let a = 12345;
-        let inv_a = mod_inv(a);
-        let chk = mul_mod(a, inv_a);
+        let inv_a = inv(a);
+        let chk = mul(a, inv_a);
         assert_eq!(chk, 1);
     }
 }

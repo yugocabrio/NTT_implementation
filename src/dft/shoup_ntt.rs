@@ -1,6 +1,6 @@
 use rand::Rng;
 use crate::dft::DFT;
-use crate::dft::field::{mul as field_mul, inv as field_inv, exp as field_exp, add as field_add, sub as field_sub};
+use crate::dft::field::{mul, inv, exp, add, sub};
 use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
 
 pub struct ShoupTable {
@@ -27,9 +27,9 @@ impl ShoupTable {
         let q = 0x1fffffffffe00001u64;
         let n = 1 << 16;
         let psi = 0x15eb043c7aa2b01fu64;
-        let psi_inv = field_inv(psi, q).expect("cannot invert psi");
+        let psi_inv = inv(psi, q).expect("cannot invert psi");
 
-        let inv_n_val = field_inv(n as u64, q).expect("cannot invert n");
+        let inv_n_val = inv(n as u64, q).expect("cannot invert n");
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
         let (mut fwd_twid, mut inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
@@ -58,7 +58,7 @@ impl ShoupTable {
         // find psi
         let (psi, psi_inv) = find_primitive_2nth_root_of_unity(q, n)?;
 
-        let inv_n_val = field_inv(n as u64, q)?;
+        let inv_n_val = inv(n as u64, q)?;
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
         let (mut fwd_twid, mut inv_twid) = build_bitrev_tables(q, n, psi, psi_inv);
@@ -103,8 +103,8 @@ impl ShoupTable {
                     let tv = unsafe { *a.get_unchecked(j + half) };
                     let v = shoup_mul(tv, (w, w_shoup), q);
 
-                    let sum_ = field_add(u, v, q);
-                    let diff_ = field_sub(u, v, q);
+                    let sum_ = add(u, v, q);
+                    let diff_ = sub(u, v, q);
 
                     unsafe {
                         *a.get_unchecked_mut(j) = sum_;
@@ -133,8 +133,8 @@ impl ShoupTable {
                     let u = unsafe { *a.get_unchecked(j) };
                     let v = unsafe { *a.get_unchecked(j + half) };
 
-                    let sum_ = field_add(u, v, q);
-                    let diff_ = field_sub(u, v, q);
+                    let sum_ = add(u, v, q);
+                    let diff_ = sub(u, v, q);
                     let diff_m = shoup_mul(diff_, (w, w_shoup), q);
 
                     unsafe {
@@ -189,8 +189,8 @@ fn build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u6
         fwd[ridx] = shoup_precompute(power_psi, q);
         inv[ridx] = shoup_precompute(power_psi_inv, q);
 
-        power_psi = field_mul(power_psi, psi, q);
-        power_psi_inv = field_mul(power_psi_inv, psi_inv, q);
+        power_psi = mul(power_psi, psi, q);
+        power_psi_inv = mul(power_psi_inv, psi_inv, q);
     }
     (fwd, inv)
 }
@@ -210,15 +210,15 @@ fn find_primitive_2nth_root_of_unity(q: u64, n: usize) -> Option<(u64,u64)> {
     loop {
         let x_random = rng.gen_range(1..q);
 
-        let g = field_exp(x_random, exponent, q);
+        let g = exp(x_random, exponent, q);
 
         // g^n == q-1" (≡ -1 mod q)
-        let g_n = field_exp(g, n as u64, q);
+        let g_n = exp(g, n as u64, q);
         if g_n == q.wrapping_sub(1) {
             // "g^(2n) == 1"
-            let g_2n = field_exp(g, two_n, q);
+            let g_2n = exp(g, two_n, q);
             if g_2n == 1 {
-                if let Some(g_inv) = field_inv(g, q) {
+                if let Some(g_inv) = inv(g, q) {
                     return Some((g, g_inv));
                 }
             }
