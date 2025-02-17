@@ -11,7 +11,7 @@ use core::arch::aarch64::{
     vsubq_u32,
 };
 
-/// NTT implementation for a 32-bit prime using Barrett reduction and NEON vectorization.
+/// NTT implementation for p to a 32-bit prime using Barrett reduction and NEON vectorization.
 pub struct BarrettVectorNtt {
     q: u32,
     n: usize,
@@ -238,7 +238,7 @@ mod tests {
         {
             let q = 2013265921u32;
             let n = 8;
-            let table = BarrettVectorNtt::with_params(q, n).expect("cannot build");
+            let table = BarrettVectorNtt::with_params(q, n).unwrap();
 
             let mut rng = thread_rng();
             let mut data = vec![0u32; n];
@@ -259,7 +259,7 @@ mod tests {
         {
             let q = 1062862849u32;
             let n = 8;
-            let table = BarrettVectorNtt::with_params(q, n).expect("cannot build");
+            let table = BarrettVectorNtt::with_params(q, n).unwrap();
 
             let mut rng = thread_rng();
             let mut a = vec![0u32; n];

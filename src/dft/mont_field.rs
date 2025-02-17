@@ -73,15 +73,14 @@ impl MontgomeryContext {
     }
 }
 
-/// Multiplies two numbers in Montgomery form and reduces them
-/// x_mont * y_mont)/R mod m)
+/// (x_mont * y_mont)/R mod m)
 #[inline(always)]
 pub fn mont_mul(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let t = (x_mont as u128) * (y_mont as u128);
     ctx.mont_reduce(t)
 }
 
-/// Adds two numbers in Montgomery form (mod m).
+/// (mont_x+mont_y) mod m
 #[inline(always)]
 pub fn mont_add(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let s = x_mont.wrapping_add(y_mont);
@@ -92,7 +91,7 @@ pub fn mont_add(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     }
 }
 
-/// Subtracts two numbers in Montgomery form (mod m).
+/// (mont_x-mont_y) mod m
 #[inline(always)]
 pub fn mont_sub(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let d = x_mont.wrapping_sub(y_mont);
@@ -103,7 +102,7 @@ pub fn mont_sub(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     }
 }
 
-/// Exponentiates a Montgomery-form base base_mont by exp (mod m).
+/// (mont_base^exp) mod m
 #[inline(always)]
 pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
     let mut result = ctx.to_mont(1);
@@ -119,7 +118,7 @@ pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
     result
 }
 
-/// Computes the inverse of x_mont (in Montgomery form) using Fermat's little theorem.
+/// mont_a^(m-2) mod m Fermat's little theorem.
 #[inline]
 pub fn mont_inv(x_mont: u64, ctx: &MontgomeryContext) -> Option<u64> {
     if x_mont == 0 {
@@ -287,7 +286,7 @@ mod tests {
 
         // inverse of 5 is 7
         let x_mont = ctx.to_mont(5);
-        let result_mont = mont_inv(x_mont, &ctx).expect("must have inverse");
+        let result_mont = mont_inv(x_mont, &ctx).unwrap();
         let result = ctx.from_mont(result_mont);
 
         assert_eq!((5 * result) % 17, 1);

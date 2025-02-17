@@ -3,7 +3,7 @@ use crate::dft::util::{build_bitrev_tables_u32, find_primitive_2nth_root_of_unit
 use crate::dft::DFT;
 use rand::Rng;
 
-/// NTT implementation for a 32-bit prime using Barrett reduction in scalar form.
+/// NTT implementation for up to a 32-bit prime using Barrett reduction in scalar form.
 pub struct BarrettScalarNtt {
     q: u32,
     n: usize,
@@ -147,7 +147,7 @@ mod tests {
     fn test_barret_scalar_forward_backward() {
         let q = 2013265921u32;
         let n = 8;
-        let table = BarrettScalarNtt::with_params(q, n).expect("cannot build");
+        let table = BarrettScalarNtt::with_params(q, n).unwrap();
 
         let mut rng = thread_rng();
         let mut data = vec![0u32; n];
@@ -165,7 +165,7 @@ mod tests {
     fn test_barret_scalar_polymul() {
         let q = 1062862849u32;
         let n = 8;
-        let table = BarrettScalarNtt::with_params(q, n).expect("cannot build");
+        let table = BarrettScalarNtt::with_params(q, n).unwrap();
 
         let mut rng = thread_rng();
         let mut a = vec![0u32; n];

@@ -95,7 +95,6 @@ impl ShoupTable {
         self.n
     }
 
-    /// Uses Shoup multiplication for each twiddle-factor multiply.
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u64]) {
         let q = self.q;
@@ -221,7 +220,7 @@ mod tests {
     fn shoup_forward_backward_small_prime() {
         let q = 7681u64;
         let n = 16usize;
-        let table = ShoupTable::with_params(q, n).expect("cannot build");
+        let table = ShoupTable::with_params(q, n).unwrap();
 
         let mut rng = thread_rng();
         let mut data = vec![0u64; n];
@@ -257,7 +256,7 @@ mod tests {
         let q = 7681u64;
         let n = 8usize;
 
-        let table = ShoupTable::with_params(q, n).expect("error");
+        let table = ShoupTable::with_params(q, n).unwrap();
 
         let mut rng = rand::thread_rng();
         let mut a = vec![0u64; n];

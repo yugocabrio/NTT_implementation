@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn goldi_test_forward_backward_n8() {
         let n = 8;
-        let table = GoldilocksNttTable::with_params(n).expect("cannot find it");
+        let table = GoldilocksNttTable::with_params(n).unwrap();
         let mut rng = thread_rng();
 
         let mut data = vec![0u64; n];

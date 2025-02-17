@@ -38,6 +38,8 @@ cargo bench
 ```
 Note that `barrett_vector.rs` code runs only on target_arch = "aarch64".
 
+Here is a speed comparison of `forward_inplace`.
+
 ### A general-purpose NTT for up to 64-bit prime  
 | log_n | `mont_ntt.rs`| `shoup_ntt.rs`| `concrete_ntt` |
 |-------|----------:|----------:|-------------:|
@@ -81,12 +83,12 @@ Note that `barrett_vector.rs` code runs only on target_arch = "aarch64".
 ```
 cargo test
 ```
-This command runs unit tests for various finite field arithmetic, as well as the NTT identity and polynomial multiplication tests.
+This command runs unit tests for various finite field arithmetic, as well as the NTT round-trip and polynomial multiplication tests.
 
 ---
 
 ## TODO
 
-- [ ] Address any warnings from `cargo clippy`.
 - [ ] Implement vectorized `barrett_mul` with NEON.
+- [ ] Address any warnings from `cargo clippy`.
 - [ ] Apply parallelization to the butterfly algorithm.
