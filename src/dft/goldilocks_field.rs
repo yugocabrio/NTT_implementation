@@ -8,7 +8,7 @@ pub const GOLDILOCKS_P: u64 = 0xFFFF_FFFF_0000_0001;
 pub fn reduce128(x: u128) -> u64 {
     const EPSILON: u64 = (1 << 32) - 1;
 
-    let x_lo = x as u64;         // lower 64 bits (x0..x1)
+    let x_lo = x as u64; // lower 64 bits (x0..x1)
     let x_hi = (x >> 64) as u64; // upper 64 bits (x2..x3)
 
     // break x_hi into x3 (upper 32 bits) and x2 (lower 32 bits)
@@ -62,7 +62,6 @@ pub fn sub(a: u64, b: u64) -> u64 {
         diff
     }
 }
-
 
 /// (base^exp mod GOLDILOCKS_P)
 #[inline(always)]

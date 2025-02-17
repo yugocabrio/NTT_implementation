@@ -1,5 +1,5 @@
+use crate::dft::goldilocks_field::{add, exp, inv, mul, sub, GOLDILOCKS_P};
 use crate::dft::DFT;
-use crate::dft::goldilocks_field::{GOLDILOCKS_P, mul, add, sub, inv, exp};
 use rand::Rng;
 
 /// A struct for performing NTT with the Goldilocks prime.
@@ -23,7 +23,15 @@ impl GoldilocksNttTable {
         let inv_n = inv(n as u64);
 
         let (fwd_twid, inv_twid) = build_bitrev_tables(n, psi, psi_inv);
-        Self { q, n, psi, psi_inv, fwd_twid, inv_twid, inv_n }
+        Self {
+            q,
+            n,
+            psi,
+            psi_inv,
+            fwd_twid,
+            inv_twid,
+            inv_n,
+        }
     }
 
     pub fn with_params(n: usize) -> Option<Self> {
@@ -33,14 +41,26 @@ impl GoldilocksNttTable {
         let (psi, psi_inv) = find_primitive_2n_root_of_unity(n)?;
         let (fwd_twid, inv_twid) = build_bitrev_tables(n, psi, psi_inv);
         let inv_n = inv(n as u64);
-        Some(Self { q: GOLDILOCKS_P, n, psi, psi_inv, fwd_twid, inv_twid, inv_n })
+        Some(Self {
+            q: GOLDILOCKS_P,
+            n,
+            psi,
+            psi_inv,
+            fwd_twid,
+            inv_twid,
+            inv_n,
+        })
     }
 
     #[inline(always)]
-    pub fn q(&self) -> u64 { self.q }
+    pub fn q(&self) -> u64 {
+        self.q
+    }
 
     #[inline(always)]
-    pub fn size(&self) -> usize { self.n }
+    pub fn size(&self) -> usize {
+        self.n
+    }
 
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u64]) {
@@ -56,11 +76,11 @@ impl GoldilocksNttTable {
                 let end = base + half;
 
                 for j in base..end {
-                    let u  = unsafe { *a.get_unchecked(j) };
+                    let u = unsafe { *a.get_unchecked(j) };
                     let tv = unsafe { *a.get_unchecked(j + half) };
 
                     let v = mul(tv, w);
-                    let sum_  = add(u, v);
+                    let sum_ = add(u, v);
                     let diff_ = sub(u, v);
 
                     unsafe {
@@ -90,7 +110,7 @@ impl GoldilocksNttTable {
                     let u = unsafe { *a.get_unchecked(j) };
                     let v = unsafe { *a.get_unchecked(j + half) };
 
-                    let sum_  = add(u, v);
+                    let sum_ = add(u, v);
                     let diff_ = sub(u, v);
                     let diffm = mul(diff_, w);
 
@@ -162,8 +182,8 @@ fn build_bitrev_tables(n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dft::goldilocks_field::{add, mul, sub, GOLDILOCKS_P};
     use crate::dft::DFT;
-    use crate::dft::goldilocks_field::{mul, add, sub, GOLDILOCKS_P};
     use rand::{thread_rng, Rng};
 
     fn poly_negacyclic_naive(a: &[u64], b: &[u64]) -> Vec<u64> {
@@ -187,8 +207,7 @@ mod tests {
     #[test]
     fn goldi_test_forward_backward_n8() {
         let n = 8;
-        let table = GoldilocksNttTable::with_params(n)
-            .expect("cannot find it");
+        let table = GoldilocksNttTable::with_params(n).expect("cannot find it");
         let mut rng = thread_rng();
 
         let mut data = vec![0u64; n];

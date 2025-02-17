@@ -1,12 +1,7 @@
-use rand::Rng;
+use crate::dft::barrett_field_32bit::{add, barrett_mul, barrett_precompute, exp, inv, mul, sub};
+use crate::dft::util::{build_bitrev_tables_u32, find_primitive_2nth_root_of_unity_32};
 use crate::dft::DFT;
-use crate::dft::barrett_field_32bit::{
-    barrett_precompute, barrett_mul, add, sub, mul, exp, inv,
-};
-use crate::dft::util::{
-    find_primitive_2nth_root_of_unity_32,
-    build_bitrev_tables_u32,
-};
+use rand::Rng;
 
 /// NTT implementation for a 32-bit prime using Barrett reduction in scalar form.
 pub struct BarrettScalarNtt {
@@ -25,8 +20,8 @@ impl BarrettScalarNtt {
         if !n.is_power_of_two() {
             return None;
         }
-        let two_n = 2*(n as u32);
-        if (q-1) % two_n != 0 {
+        let two_n = 2 * (n as u32);
+        if (q - 1) % two_n != 0 {
             return None;
         }
 
@@ -49,10 +44,14 @@ impl BarrettScalarNtt {
     }
 
     #[inline(always)]
-    pub fn q(&self) -> u32 { self.q }
+    pub fn q(&self) -> u32 {
+        self.q
+    }
 
     #[inline(always)]
-    pub fn size(&self) -> usize { self.n }
+    pub fn size(&self) -> usize {
+        self.n
+    }
 
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u32]) {
@@ -65,19 +64,19 @@ impl BarrettScalarNtt {
             half >>= 1;
             for i in 0..step {
                 let w = self.fwd_twid[step + i];
-                let base = 2*i*half;
-                let end  = base + half;
+                let base = 2 * i * half;
+                let end = base + half;
                 for j in base..end {
-                    let u  = unsafe { *a.get_unchecked(j) };
-                    let tv = unsafe { *a.get_unchecked(j+half) };
+                    let u = unsafe { *a.get_unchecked(j) };
+                    let tv = unsafe { *a.get_unchecked(j + half) };
 
                     let v = barrett_mul(tv, w, q, p_bar);
 
-                    let sum_  = add(u, v, q);
+                    let sum_ = add(u, v, q);
                     let diff_ = sub(u, v, q);
 
                     unsafe {
-                        *a.get_unchecked_mut(j)        = sum_;
+                        *a.get_unchecked_mut(j) = sum_;
                         *a.get_unchecked_mut(j + half) = diff_;
                     }
                 }
@@ -98,18 +97,18 @@ impl BarrettScalarNtt {
             let halfstep = step >> 1;
             for i in 0..halfstep {
                 let w = self.inv_twid[halfstep + i];
-                let base = 2*i*half;
-                let end  = base + half;
+                let base = 2 * i * half;
+                let end = base + half;
                 for j in base..end {
                     let u = unsafe { *a.get_unchecked(j) };
-                    let v = unsafe { *a.get_unchecked(j+half) };
+                    let v = unsafe { *a.get_unchecked(j + half) };
 
-                    let sum_  = add(u, v, q);
+                    let sum_ = add(u, v, q);
                     let diff_ = sub(u, v, q);
                     let diffm = barrett_mul(diff_, w, q, p_bar);
 
                     unsafe {
-                        *a.get_unchecked_mut(j)        = sum_;
+                        *a.get_unchecked_mut(j) = sum_;
                         *a.get_unchecked_mut(j + half) = diffm;
                     }
                 }
@@ -128,30 +127,34 @@ impl BarrettScalarNtt {
 }
 
 impl DFT<u32> for BarrettScalarNtt {
-    fn forward_inplace(&self, x: &mut [u32]) { self.forward_inplace(x); }
-    fn backward_inplace(&self, x: &mut [u32]) { self.backward_inplace(x); }
+    fn forward_inplace(&self, x: &mut [u32]) {
+        self.forward_inplace(x);
+    }
+    fn backward_inplace(&self, x: &mut [u32]) {
+        self.backward_inplace(x);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dft::util::{ naive_negacyclic_u32, pointwise_u32 };
+    use crate::dft::util::{naive_negacyclic_u32, pointwise_u32};
 
     use rand::thread_rng;
     use rand::Rng;
 
     #[test]
     fn test_barret_scalar_forward_backward() {
-        let q= 2013265921u32;
-        let n= 8;
-        let table= BarrettScalarNtt::with_params(q, n).expect("cannot build");
+        let q = 2013265921u32;
+        let n = 8;
+        let table = BarrettScalarNtt::with_params(q, n).expect("cannot build");
 
-        let mut rng= thread_rng();
-        let mut data= vec![0u32; n];
+        let mut rng = thread_rng();
+        let mut data = vec![0u32; n];
         for x in data.iter_mut() {
-            *x= rng.gen_range(0..q);
+            *x = rng.gen_range(0..q);
         }
-        let orig= data.clone();
+        let orig = data.clone();
 
         table.forward_inplace(&mut data);
         table.backward_inplace(&mut data);
@@ -160,21 +163,21 @@ mod tests {
 
     #[test]
     fn test_barret_scalar_polymul() {
-        let q= 1062862849u32;
-        let n= 8;
-        let table= BarrettScalarNtt::with_params(q, n).expect("cannot build");
+        let q = 1062862849u32;
+        let n = 8;
+        let table = BarrettScalarNtt::with_params(q, n).expect("cannot build");
 
-        let mut rng= thread_rng();
-        let mut a= vec![0u32; n];
-        let mut b= vec![0u32; n];
+        let mut rng = thread_rng();
+        let mut a = vec![0u32; n];
+        let mut b = vec![0u32; n];
         for i in 0..n {
-            a[i]= rng.gen_range(0..q);
-            b[i]= rng.gen_range(0..q);
+            a[i] = rng.gen_range(0..q);
+            b[i] = rng.gen_range(0..q);
         }
-        let c_naive= naive_negacyclic_u32(&a, &b, q);
+        let c_naive = naive_negacyclic_u32(&a, &b, q);
 
-        let mut fa= a.clone();
-        let mut fb= b.clone();
+        let mut fa = a.clone();
+        let mut fb = b.clone();
         table.forward_inplace(&mut fa);
         table.forward_inplace(&mut fb);
 

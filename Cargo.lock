@@ -44,6 +44,7 @@ dependencies = [
  "plonky2_field",
  "plonky2_util",
  "rand",
+ "rayon",
 ]
 
 [[package]]

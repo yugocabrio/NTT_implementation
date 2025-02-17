@@ -130,7 +130,7 @@ pub fn mont_inv(x_mont: u64, ctx: &MontgomeryContext) -> Option<u64> {
     Some(result_mont)
 }
 
-/// Finds the inverse of a modulo m (here m is 2^k) by extended Euclid. 
+/// Finds the inverse of a modulo m (here m is 2^k) by extended Euclid.
 /// This is used for Montgomery setup.
 #[inline]
 fn inv_mod_u64(a: u64, m: u64) -> Option<u64> {
@@ -192,7 +192,7 @@ mod tests {
     fn test_to_mont_from_mont() {
         let ctx = MontgomeryContext::new(17, 5);
         // 10*32 mod 17 = 14
-        let x_mont = ctx.to_mont(10); 
+        let x_mont = ctx.to_mont(10);
         assert_eq!(x_mont, 14);
 
         // 10 mod 17
@@ -206,7 +206,7 @@ mod tests {
         // g = a*x + b*y
         let (gcd, x, y) = extended_gcd(30, 18);
         assert_eq!(gcd, 6);
-        assert_eq!(30*x + 18*y, 6);
+        assert_eq!(30 * x + 18 * y, 6);
     }
 
     #[test]
@@ -218,14 +218,14 @@ mod tests {
         // gcd(6,12)=6=>None
         assert_eq!(inv_mod_u64(6, 12), None);
     }
-    
+
     #[test]
     fn test_mont_mul() {
         // m = 17, k = 5, R = 32
         let ctx = MontgomeryContext::new(17, 5);
         let x = 3;
         let y = 5;
-        let x_mont = ctx.to_mont(x); 
+        let x_mont = ctx.to_mont(x);
         let y_mont = ctx.to_mont(y);
 
         // (3*5)%17=15

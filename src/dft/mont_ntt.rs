@@ -1,22 +1,20 @@
+use crate::dft::field::{exp, inv, mul};
+use crate::dft::mont_field::{mont_add, mont_inv, mont_mul, mont_sub, MontgomeryContext};
+use crate::dft::util::{build_bitrev_tables_u64, find_primitive_2nth_root_of_unity_64};
 use crate::dft::DFT;
-use crate::dft::mont_field::{
-    MontgomeryContext, mont_add, mont_sub, mont_mul, mont_inv
-};
-use crate::dft::field::{mul, exp, inv};
 use rand::Rng;
-use crate::dft::util::{find_primitive_2nth_root_of_unity_64, build_bitrev_tables_u64};
 
 /// A structure for performing NTT using Montgomery multiplication.
-pub struct MontTable{
+pub struct MontTable {
     /// NTT friendly prime
     q: u64,
     /// n, the power of 2
-    n : usize,
+    n: usize,
     /// 2n-th root of unity
     psi: u64,
     /// inverse of psi
     psi_inv: u64,
-    
+
     /// Bit-reversed twiddle factors
     fwd_twid: Vec<u64>,
     /// same but inverse
@@ -25,7 +23,7 @@ pub struct MontTable{
     /// n^-1 mod q in mont form (used for the backward transform)
     inv_n: u64,
 
-    /// Montgomery context for operations mod `q`.
+    /// Montgomery context for operations mod q.
     mont: MontgomeryContext,
 }
 
@@ -34,9 +32,9 @@ impl MontTable {
     #[inline(always)]
     pub fn new() -> Self {
         let q = 0x1fffffffffe00001u64;
-        let n =  1<<16;
+        let n = 1 << 16;
         // 2^17-th root of unity
-        let psi =  0x15eb043c7aa2b01fu64; 
+        let psi = 0x15eb043c7aa2b01fu64;
         let psi_inv = inv(psi, q).expect("cannot calc invere of psi");
 
         // Build bitrev twiddle factors but not in Montgomery form yet
@@ -58,7 +56,7 @@ impl MontTable {
         let inv_n = mont_inv(n_mont, &mont).expect("cannot calc inverse of n");
 
         Self {
-            q, 
+            q,
             n,
             psi,
             psi_inv,
@@ -102,7 +100,8 @@ impl MontTable {
         let inv_n = mont_inv(n_mont, &mont)?;
 
         Some(Self {
-            q, n,
+            q,
+            n,
             psi,
             psi_inv,
             fwd_twid,
@@ -113,9 +112,13 @@ impl MontTable {
     }
 
     #[inline(always)]
-    pub fn q(&self) -> u64 { self.q }
+    pub fn q(&self) -> u64 {
+        self.q
+    }
     #[inline(always)]
-    pub fn size(&self) -> usize { self.n }
+    pub fn size(&self) -> usize {
+        self.n
+    }
 
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u64]) {
@@ -138,7 +141,6 @@ impl MontTable {
 
                     a[j] = mont_add(u, v, &self.mont);
                     a[j + t] = mont_sub(u, v, &self.mont);
-
                 }
             }
             m <<= 1;
@@ -201,49 +203,47 @@ impl DFT<u64> for MontTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dft::DFT;
     use crate::dft::field::{
-        add as field_add, sub as field_sub, mul as field_mul, exp as field_exp
+        add as field_add, exp as field_exp, mul as field_mul, sub as field_sub,
     };
-    use crate::dft::util::{ naive_negacyclic_u64, pointwise_u64 };
+    use crate::dft::util::{naive_negacyclic_u64, pointwise_u64};
+    use crate::dft::DFT;
     use rand::thread_rng;
     use rand::Rng;
-
 
     #[test]
     fn forward_backward_small_prime() {
         let q = 7681u64;
         let n = 16usize;
-        let table = MontTable::with_params(q, n)
-            .expect("cannot build");
-    
+        let table = MontTable::with_params(q, n).expect("cannot build");
+
         let mut rng = thread_rng();
         let mut data = vec![0u64; n];
         for x in data.iter_mut() {
             *x = rng.gen_range(0..q);
         }
         let orig = data.clone();
-    
+
         table.forward_inplace(&mut data);
         table.backward_inplace(&mut data);
-    
+
         assert_eq!(data, orig);
-    }    
-    
+    }
+
     #[test]
-    fn forward_backward_default(){
-        let table=MontTable::new();
-        let q=table.q();
-        let n=table.size();
-        let mut rng=thread_rng();
-        let mut data=vec![0u64;n];
-        for x in data.iter_mut(){
-            *x=rng.gen_range(0..q);
+    fn forward_backward_default() {
+        let table = MontTable::new();
+        let q = table.q();
+        let n = table.size();
+        let mut rng = thread_rng();
+        let mut data = vec![0u64; n];
+        for x in data.iter_mut() {
+            *x = rng.gen_range(0..q);
         }
-        let orig=data.clone();
+        let orig = data.clone();
         table.forward_inplace(&mut data);
         table.backward_inplace(&mut data);
-        assert_eq!(data,orig);
+        assert_eq!(data, orig);
     }
 
     #[test]
@@ -251,8 +251,7 @@ mod tests {
         let q = 7681u64;
         let n = 8usize;
 
-        let table = MontTable::with_params(q, n)
-            .expect("error");
+        let table = MontTable::with_params(q, n).expect("error");
 
         let mut rng = rand::thread_rng();
         let mut a = vec![0u64; n];
@@ -276,8 +275,8 @@ mod tests {
     #[ignore]
     fn test_ntt_polymul_default() {
         let table = MontTable::new();
-        let q=table.q();
-        let n=table.size();
+        let q = table.q();
+        let n = table.size();
 
         let mut rng = rand::thread_rng();
         let mut a = vec![0u64; n];

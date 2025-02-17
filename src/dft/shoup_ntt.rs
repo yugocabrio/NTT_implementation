@@ -1,8 +1,8 @@
-use rand::Rng;
-use crate::dft::DFT;
-use crate::dft::field::{mul, inv, exp, add, sub};
+use crate::dft::field::{add, exp, inv, mul, sub};
 use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
-use crate::dft::util::{find_primitive_2nth_root_of_unity_64};
+use crate::dft::util::find_primitive_2nth_root_of_unity_64;
+use crate::dft::DFT;
+use rand::Rng;
 
 /// A structure for performing NTT using Shoup multiplication.
 pub struct ShoupTable {
@@ -17,11 +17,11 @@ pub struct ShoupTable {
 
     /// Bit-reversed twiddle factors (forward). Each element is (w, w_shoup),
     /// so we can do (a * w) mod q via Shoup multiplication.
-    fwd_twid: Vec<(u64,u64)>,
+    fwd_twid: Vec<(u64, u64)>,
     /// Bit-reversed twiddle factors (inverse)
-    inv_twid: Vec<(u64,u64)>,
+    inv_twid: Vec<(u64, u64)>,
 
-    /// n^-1 in normal form + its shoup counterpart. 
+    /// n^-1 in normal form + its shoup counterpart.
     /// Used for final scaling in inverse NTT.
     inv_n: (u64, u64),
 }
@@ -62,7 +62,7 @@ impl ShoupTable {
         if !n.is_power_of_two() {
             return None;
         }
-        if (q - 1) % (2*n as u64) != 0 {
+        if (q - 1) % (2 * n as u64) != 0 {
             return None;
         }
 
@@ -181,12 +181,15 @@ impl DFT<u64> for ShoupTable {
 
 /// Builds bit-reversed tables of (w, w_shoup) pairs for Shoup multiplication
 #[inline]
-fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64)
-    -> (Vec<(u64,u64)>, Vec<(u64,u64)>)
-{
+fn shoup_build_bitrev_tables(
+    q: u64,
+    n: usize,
+    psi: u64,
+    psi_inv: u64,
+) -> (Vec<(u64, u64)>, Vec<(u64, u64)>) {
     let log_n = n.trailing_zeros();
-    let mut fwd = vec![(0u64,0u64); n];
-    let mut inv = vec![(0u64,0u64); n];
+    let mut fwd = vec![(0u64, 0u64); n];
+    let mut inv = vec![(0u64, 0u64); n];
 
     let mut power_psi = 1u64;
     let mut power_psi_inv = 1u64;
@@ -209,45 +212,44 @@ fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dft::util::{naive_negacyclic_u64, pointwise_u64};
     use crate::dft::DFT;
     use rand::thread_rng;
     use rand::Rng;
-    use crate::dft::util::{ naive_negacyclic_u64, pointwise_u64 };
 
     #[test]
     fn shoup_forward_backward_small_prime() {
         let q = 7681u64;
         let n = 16usize;
-        let table = ShoupTable::with_params(q, n)
-            .expect("cannot build");
-    
+        let table = ShoupTable::with_params(q, n).expect("cannot build");
+
         let mut rng = thread_rng();
         let mut data = vec![0u64; n];
         for x in data.iter_mut() {
             *x = rng.gen_range(0..q);
         }
         let orig = data.clone();
-    
+
         table.forward_inplace(&mut data);
         table.backward_inplace(&mut data);
-    
+
         assert_eq!(data, orig);
-    }    
-    
+    }
+
     #[test]
-    fn shoup_forward_backward_default(){
-        let table=ShoupTable::new();
-        let q=table.q();
-        let n=table.size();
-        let mut rng=thread_rng();
-        let mut data=vec![0u64;n];
-        for x in data.iter_mut(){
-            *x=rng.gen_range(0..q);
+    fn shoup_forward_backward_default() {
+        let table = ShoupTable::new();
+        let q = table.q();
+        let n = table.size();
+        let mut rng = thread_rng();
+        let mut data = vec![0u64; n];
+        for x in data.iter_mut() {
+            *x = rng.gen_range(0..q);
         }
-        let orig=data.clone();
+        let orig = data.clone();
         table.forward_inplace(&mut data);
         table.backward_inplace(&mut data);
-        assert_eq!(data,orig);
+        assert_eq!(data, orig);
     }
 
     #[test]
@@ -255,8 +257,7 @@ mod tests {
         let q = 7681u64;
         let n = 8usize;
 
-        let table = ShoupTable::with_params(q, n)
-            .expect("error");
+        let table = ShoupTable::with_params(q, n).expect("error");
 
         let mut rng = rand::thread_rng();
         let mut a = vec![0u64; n];
@@ -280,8 +281,8 @@ mod tests {
     #[ignore]
     fn shoup_test_ntt_polymul_default() {
         let table = ShoupTable::new();
-        let q=table.q();
-        let n=table.size();
+        let q = table.q();
+        let n = table.size();
 
         let mut rng = rand::thread_rng();
         let mut a = vec![0u64; n];
@@ -300,5 +301,4 @@ mod tests {
 
         assert_eq!(a, result_naive);
     }
-
 }

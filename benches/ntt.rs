@@ -1,13 +1,11 @@
-use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion
-};
-use rand::Rng;
-use app::dft::DFT;
+use app::dft::goldilocks_field::{reduce128, GOLDILOCKS_P};
+use app::dft::goldilocks_ntt::GoldilocksNttTable;
 use app::dft::mont_ntt::MontTable;
 use app::dft::shoup_ntt::ShoupTable;
+use app::dft::DFT;
 use concrete_ntt::prime64;
-use app::dft::goldilocks_ntt::{GoldilocksNttTable};
-use app::dft::goldilocks_field::{reduce128, GOLDILOCKS_P};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use rand::Rng;
 
 use plonky2_field::{
     fft::{fft, ifft},
@@ -91,7 +89,7 @@ fn bench_ntt_compare(c: &mut Criterion) {
         }
 
         // Goldilocks
-        if (GOLDILOCKS_P - 1) % (2*(n as u64)) == 0 {
+        if (GOLDILOCKS_P - 1) % (2 * (n as u64)) == 0 {
             if let Some(goldi_table) = GoldilocksNttTable::with_params(n) {
                 let bench_id = BenchmarkId::new("goldilocks-forward_inplace", n);
                 group.bench_with_input(bench_id, &n, |b, &_| {
@@ -236,9 +234,9 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
         }
 
         // Goldilocks poly mul
-        if (GOLDILOCKS_P - 1) % (2*(n as u64)) == 0 {
+        if (GOLDILOCKS_P - 1) % (2 * (n as u64)) == 0 {
             if let Some(gold_table) = GoldilocksNttTable::with_params(n) {
-                let bench_id= BenchmarkId::new("goldilocks-polymul", n);
+                let bench_id = BenchmarkId::new("goldilocks-polymul", n);
                 group.bench_with_input(bench_id, &n, |b, &_| {
                     b.iter_batched(
                         || {
@@ -251,7 +249,7 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
                             for x in &mut b {
                                 *x = rng.gen_range(0..GOLDILOCKS_P);
                             }
-                            (a,b)
+                            (a, b)
                         },
                         |(mut a, mut b)| {
                             gold_table.forward_inplace(&mut a);
@@ -307,6 +305,6 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_ntt_compare,
-    bench_ntt_polymul_compare,
+    // bench_ntt_polymul_compare,
 );
 criterion_main!(benches);

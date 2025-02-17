@@ -1,12 +1,10 @@
-use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion
-};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use rand::Rng;
 
-use app::dft::barrett_scalar_ntt::BarrettScalarNtt; 
+use app::dft::barrett_scalar_ntt::BarrettScalarNtt;
 use app::dft::barrett_vector_ntt::BarrettVectorNtt;
-use concrete_ntt::prime32;
 use app::dft::util::pointwise_u32;
+use concrete_ntt::prime32;
 
 const PRIME_32: u32 = 1062862849;
 
@@ -195,6 +193,6 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_ntt_compare,
-    bench_ntt_polymul_compare,
+    // bench_ntt_polymul_compare,
 );
 criterion_main!(benches);

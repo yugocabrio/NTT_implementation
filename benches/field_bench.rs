@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
 use app::dft::field as naive;
@@ -56,7 +56,7 @@ fn bench_naive_exp(c: &mut Criterion) {
     c.bench_function("naive_exp_61bit", |b| {
         b.iter(|| {
             let base = black_box(rng.gen_range(0..BIG_Q));
-            let exp_ = black_box(rng.gen_range(0..10000)); 
+            let exp_ = black_box(rng.gen_range(0..10000));
             let _ = naive::exp(base, exp_, BIG_Q);
         })
     });
