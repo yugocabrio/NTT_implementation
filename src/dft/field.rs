@@ -8,7 +8,6 @@ pub fn add(a: u64, b: u64, p: u64) -> u64 {
 /// a-b mod q
 #[inline(always)]
 pub fn sub(a: u64, b: u64, p: u64) -> u64 {
-    // a + q - b
     let c = a.wrapping_add(p).wrapping_sub(b);
     if c >= p { c - p } else { c }
 }

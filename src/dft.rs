@@ -8,8 +8,9 @@ pub mod shoup_ntt;
 pub mod goldilocks_field;
 pub mod goldilocks_ntt;
 pub mod barrett_field_32bit;
-pub mod ntt_32_neon;
-pub mod ntt_32_scalar;
+pub mod barrett_vectorized_ntt;
+pub mod barrett_scalar_ntt;
+pub mod util;
 
 pub trait DFT<O> {
     fn forward_inplace(&self, x: &mut [O]);

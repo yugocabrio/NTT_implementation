@@ -1,33 +1,50 @@
-/// p < 2^31 前提で "floor(2^64 / p)" を計算
+use rand::Rng;
+#[cfg(target_arch="aarch64")]
+use core::arch::aarch64::{
+    uint32x4_t, vld1q_u32, vst1q_u32,
+    vaddq_u32, vsubq_u32, vcgeq_u32,
+    vandq_u32, vmvnq_u32, vdupq_n_u32
+};
+
+#[cfg(target_arch="aarch64")]
+use core::mem::transmute;
+
 #[inline(always)]
 pub fn barrett_precompute(p: u32) -> u64 {
     let one = 1u128 << 64;
     (one / (p as u128)) as u64
 }
 
-/// Barrett mul(32bit版)
-///   z = a*b
-///   q = floor( (z * p_bar) >> 64 )
+/// Barrett 乗算
+///   z = a*b (64bit)
+///   q = floor((z * p_bar) >> 64)
 ///   r = z - q*p
-///   if r>=p => r-p
+///   if r >= p => r - p
 #[inline(always)]
-pub fn barrett_mul(a: u32, (b,_): (u32,u32), p: u32, p_bar: u64) -> u32 {
-    // (a*b) in 64bit
+pub fn barrett_mul(a: u32, b: u32, p: u32, p_bar: u64) -> u32 {
     let z = (a as u64).wrapping_mul(b as u64);
-
-    // q = floor( (z * p_bar) >> 64 )
     let q = ((z as u128).wrapping_mul(p_bar as u128) >> 64) as u64;
-
-    // r = z - q*p
     let r = z.wrapping_sub(q.wrapping_mul(p as u64)) as u32;
-
-    // if r>=p => r-p
     if r >= p { r - p } else { r }
 }
 
 /// (a + b) mod p
 #[inline(always)]
 pub fn add(a: u32, b: u32, p: u32) -> u32 {
+    let s = a.wrapping_add(b);
+    if s >= p { s - p } else { s }
+}
+
+/// (a - b) mod p
+#[inline(always)]
+pub fn sub(a: u32, b: u32, p: u32) -> u32 {
+    let s = a.wrapping_add(p).wrapping_sub(b);
+    if s >= p { s - p } else { s }
+}
+
+/*
+#[inline(always)]
+pub fn add(a: u32, b: u32, p: u32) -> u64 {
     let (res, carry) = a.overflowing_add(b);
     let mut s = res;
     if carry || s >= p {
@@ -36,24 +53,28 @@ pub fn add(a: u32, b: u32, p: u32) -> u32 {
     s
 }
 
-/// (a - b) mod p
 #[inline(always)]
 pub fn sub(a: u32, b: u32, p: u32) -> u32 {
-    if a >= b { a - b }
-    else { a.wrapping_sub(b).wrapping_add(p) }
+    let (res, borrow) = a.overflowing_sub(b);
+    let mut s = res;
+    if borrow {
+        s = s.wrapping_add(p);
+    }
+    s
 }
+*/
 
-/// a*b mod p
+/// (a * b) mod p
 #[inline(always)]
-pub fn mul(a:u32,b:u32,p:u32)->u32 {
-    ((a as u64)*(b as u64) % (p as u64)) as u32
+pub fn mul(a: u32, b: u32, p: u32) -> u32 {
+    ((a as u64) * (b as u64) % (p as u64)) as u32
 }
 
 /// a^e mod p
 #[inline(always)]
 pub fn exp(mut base: u32, mut e: u32, p: u32) -> u32 {
     let mut r = 1u32;
-    base %= p; 
+    base %= p;
     while e > 0 {
         if (e & 1) != 0 {
             r = mul(r, base, p);
@@ -64,14 +85,30 @@ pub fn exp(mut base: u32, mut e: u32, p: u32) -> u32 {
     r
 }
 
-/// a^(p-2) mod p
+/// a^(p-2) mod p => inverse  (Fermat)
 #[inline(always)]
 pub fn inv(a: u32, p: u32) -> Option<u32> {
-    if a == 0 {
-        None
-    } else {
-        Some(exp(a, p - 2, p))
-    }
+    if a == 0 { return None; }
+    Some(exp(a, p.wrapping_sub(2), p))
+}
+
+#[cfg(target_arch="aarch64")]
+#[inline(always)]
+pub unsafe fn vec_add(u: uint32x4_t, v: uint32x4_t, p_vec: uint32x4_t) -> uint32x4_t {
+    // sum = u + v
+    let sum = vaddq_u32(u, v);
+    let cmp = vcgeq_u32(sum, p_vec);  // lane-wise: sum>=p => 0xFFFF_FFFF
+    let sub_p = vandq_u32(cmp, p_vec);// laneが1のところだけ p
+    vsubq_u32(sum, sub_p)
+}
+
+#[cfg(target_arch="aarch64")]
+#[inline(always)]
+pub unsafe fn vec_sub(u: uint32x4_t, v: uint32x4_t, p_vec: uint32x4_t) -> uint32x4_t {
+    let cmp = vcgeq_u32(u, v);
+    let diff = vsubq_u32(u, v);
+    let add_p = vandq_u32(vmvnq_u32(cmp), p_vec);
+    vaddq_u32(diff, add_p)
 }
 
 #[cfg(test)]
@@ -118,17 +155,54 @@ mod tests {
     }
 
     #[test]
-    fn test_barrett_mul() {
-        let p=13u32;
-        let p_bar= barrett_precompute(p);
-        let b_tuple= (4u32,0);
-        let r0= barrett_mul(5, b_tuple, p, p_bar);
-        assert_eq!(r0 as u64, 7);
+    fn test_barrett_mul_32() {
+        let p = 13u32;
+        let p_bar = barrett_precompute(p);
 
-        let r1 = barrett_mul(p-1, (p-1,0), p, p_bar);
-        assert_eq!(r1 as u64, 1);
+        let r = barrett_mul(7, 2, p, p_bar);
+        assert_eq!(r, 1);
 
-        let r2= barrett_mul(0, (4,0), p, p_bar);
-        assert_eq!(r2, 0);
+        let r2= barrett_mul(12,12,p,p_bar);
+        assert_eq!(r2, 1);
+    }
+
+    #[test]
+    fn test_vadd_mod() {
+        #[cfg(target_arch="aarch64")]
+        unsafe {
+            let p = 13u32;
+            let p_vec = vdupq_n_u32(p);
+
+            let a_arr = [12u32, 0u32, 5u32, 13u32];
+            let b_arr = [1u32, 13u32, 8u32, 1u32];
+
+            let a_vec = vld1q_u32(a_arr.as_ptr());
+            let b_vec = vld1q_u32(b_arr.as_ptr());
+
+            let sum_vec = vec_add(a_vec, b_vec, p_vec);
+            let sum_arr: [u32; 4] = transmute(sum_vec);
+
+            assert_eq!(sum_arr, [0, 0, 0, 1]);
+        }
+    }
+
+    #[test]
+    fn test_vsub_mod() {
+        #[cfg(target_arch="aarch64")]
+        unsafe {
+            let p= 13u32;
+            let p_vec= vdupq_n_u32(p);
+
+            let a_arr= [0u32, 12u32, 5u32, 13u32];
+            let b_arr= [1u32, 0u32, 8u32, 1u32];
+
+            let a_vec= vld1q_u32(a_arr.as_ptr());
+            let b_vec= vld1q_u32(b_arr.as_ptr());
+
+            let diff_vec= vec_sub(a_vec, b_vec, p_vec);
+            let diff_arr: [u32; 4] = transmute(diff_vec);
+
+            assert_eq!(diff_arr, [12, 12, 10, 12]);
+        }
     }
 }

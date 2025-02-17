@@ -56,14 +56,15 @@ pub fn add(a: u64, b: u64) -> u64 {
 }
 
 /// (a-b mod p)
-#[inline(always)]
 pub fn sub(a: u64, b: u64) -> u64 {
-    if a >= b {
-        a - b
+    let (diff, borrow) = a.overflowing_sub(b);
+    if borrow {
+        diff.wrapping_add(GOLDILOCKS_P)
     } else {
-        a.wrapping_sub(b).wrapping_add(GOLDILOCKS_P)
+        diff
     }
 }
+
 
 /// (base^exp mod p)
 #[inline(always)]
