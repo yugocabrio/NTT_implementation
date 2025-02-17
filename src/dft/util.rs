@@ -2,6 +2,10 @@ use rand::Rng;
 use crate::dft::field::{add as add_64, sub as sub_64, mul as mul_64, exp as exp_64, inv as inv_64};
 use crate::dft::barrett_field_32bit::{add as add_32, sub as sub_32, mul as mul_32, exp as exp_32, inv as inv_32};
 
+/// Finds a primitive 2n-th root of unity modulo p for NWC based NTT by random sampling.
+/// Checks (p - 1) is divisible by 2n, then construct g = x^(p-1/2n) (mod p) with ramdom x.
+/// Checks if g^n is -1 (mod p) and g^(2n) is 1 (mod p). 
+/// It returns (g, g_inv)
 #[inline(always)]
 pub fn find_primitive_2nth_root_of_unity_64(p: u64, n: usize) -> Option<(u64, u64)> {
     let two_n = 2 * (n as u64);
@@ -17,7 +21,7 @@ pub fn find_primitive_2nth_root_of_unity_64(p: u64, n: usize) -> Option<(u64, u6
         // g^n = p-1 => -1 mod p
         let g_n = exp_64(g, n as u64, p);
         if g_n == p.wrapping_sub(1) {
-            // g^(2n)=1
+            // g^(2n) = 1 mod p
             let g_2n = exp_64(g, 2*(n as u64), p);
             if g_2n == 1 {
                 if let Some(g_inv) = inv_64(g, p) {
@@ -54,6 +58,9 @@ pub fn find_primitive_2nth_root_of_unity_32(p: u32, n: usize) -> Option<(u32, u3
     None
 }
 
+/// Builds bit-reversed twiddle-factor tables.
+/// fwd[i] = ψ^i mod q (with bit-reversed index mapping)
+/// inv[i] = ψ_inv^i mod q`
 #[inline(always)]
 pub fn build_bitrev_tables_u64(n: usize, q: u64 , psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>) {
     let mut fwd = vec![0u64; n];
@@ -100,19 +107,24 @@ pub fn build_bitrev_tables_u32(n: usize, q: u32 , psi: u32, psi_inv: u32) -> (Ve
     (fwd, inv)
 }   
 
-
+/// Naive negacyclic polynomial multiplication in 64-bit arithmetic.
+/// Interprets x^n = -1 and subtracts terms when the index exceeds n.
+/// This is used for the NTT-based polynomial multiplication test. 
 #[inline]
 pub fn naive_negacyclic_u64(a: &[u64], b: &[u64], p: u64) -> Vec<u64> {
     let n = a.len();
     let mut c = vec![0u64; n];
+
     for i in 0..n {
         for j in 0..n {
             let prod = mul_64(a[i], b[j], p);
             let idx  = i + j;
+
+            // If idx < n, just add to c[idx].
+            // If idx >= n, we interpret x^n = -1, so c[idx - n] -= product.
             if idx < n {
                 c[idx] = add_64(c[idx], prod, p);
             } else {
-                // idx-n => x^n≡-1 => c[idx-n] -= product
                 c[idx - n] = sub_64(c[idx - n], prod, p);
             }
         }
@@ -138,6 +150,8 @@ pub fn naive_negacyclic_u32(a: &[u32], b: &[u32], p: u32) -> Vec<u32> {
     c
 }
 
+/// Performs pointwise multiplication on two vectors under mod p.
+/// This is used for the NTT-based polynomial multiplication test.
 #[inline]
 pub fn pointwise_u64(a: &mut [u64], b: &[u64], p: u64) {
     for i in 0..a.len() {
@@ -173,7 +187,7 @@ mod tests {
         let mut a = [3u64, 5];
         let b     = [7u64, 2];
         pointwise_u64(&mut a, &b, p);
-        assert_eq!(a, [2,10], "pointwise_64 mismatch!");
+        assert_eq!(a, [2,10]);
     }
 
     #[test]

@@ -17,6 +17,7 @@ use core::arch::aarch64::{
     vandq_u32, vmvnq_u32, vdupq_n_u32
 };
 
+/// NTT implementation for a 32-bit prime using Barrett reduction and NEON vectorization.
 pub struct BarrettVectorNtt {
     q: u32,
     n: usize,
@@ -88,6 +89,7 @@ impl BarrettVectorNtt {
         let q     = self.q;
         let p_bar = self.barrett;
         let n     = self.n;
+        // broadcast q into a NEON register
         let p_vec = vdupq_n_u32(q);
 
         let mut half = n;
@@ -100,10 +102,15 @@ impl BarrettVectorNtt {
                 let end  = base + half;
 
                 let mut j = base;
+                // Vectorized butterfly, 4 elements at a time
                 while j+3 < end {
+                    // load 4 items from a[j], a[j+1], a[j+2], a[j+3] into a NEON register
                     let u_vec = vld1q_u32(a.as_ptr().add(j));
+                    // load from a[j+half..]
                     let tv_vec= vld1q_u32(a.as_ptr().add(j + half));
 
+                    // TODO: Make Vectorized Barrett_mul.
+                    // convert tv to v using barrett_mul (scalar for each lane)
                     let tv_arr: [u32;4] = core::mem::transmute(tv_vec);
                     let mut v_arr = [0u32;4];
                     for k in 0..4 {
@@ -111,14 +118,17 @@ impl BarrettVectorNtt {
                     }
                     let v_vec: uint32x4_t = core::mem::transmute(v_arr);
 
+                    // lane-wise add/sub (mod p) using vec_add / vec_sub
                     let sum_vec  = vec_add(u_vec, v_vec, p_vec);
                     let diff_vec = vec_sub(u_vec, v_vec, p_vec);
 
+                    // store back
                     vst1q_u32(a.as_mut_ptr().add(j),       sum_vec);
                     vst1q_u32(a.as_mut_ptr().add(j+half), diff_vec);
 
                     j += 4;
                 }
+                // handle remainder with scalar loop
                 while j < end {
                     let u  = unsafe { *a.get_unchecked(j) };
                     let tv = unsafe { *a.get_unchecked(j+half) };
@@ -165,6 +175,7 @@ impl BarrettVectorNtt {
                     let sum_vec      = vec_add(u_vec, tv_vec, p_vec);
                     let tmp_diff_vec = vec_sub(u_vec, tv_vec, p_vec);
 
+                    // TODO: Make Vectorized Barrett_mul.
                     let diff_arr: [u32;4] = core::mem::transmute(tmp_diff_vec);
                     let mut diffm_arr= [0u32;4];
                     for k in 0..4 {

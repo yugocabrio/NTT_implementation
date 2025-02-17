@@ -2,6 +2,7 @@ use crate::dft::DFT;
 use crate::dft::goldilocks_field::{GOLDILOCKS_P, mul, add, sub, inv, exp};
 use rand::Rng;
 
+/// A struct for performing NTT with the Goldilocks prime.
 pub struct GoldilocksNttTable {
     q: u64,
     n: usize,
@@ -13,7 +14,7 @@ pub struct GoldilocksNttTable {
 }
 
 impl GoldilocksNttTable {
-    /// デフォルト生成: n=2^16, ψ=0xabd0a6e8aa3d8a0e で固定
+    /// Creates a default table with n=2^16, psi=0xabd0a6e8aa3d8a0e.
     pub fn new() -> Self {
         let q = GOLDILOCKS_P;
         let n = 1 << 16;
@@ -25,7 +26,6 @@ impl GoldilocksNttTable {
         Self { q, n, psi, psi_inv, fwd_twid, inv_twid, inv_n }
     }
 
-    /// 任意の n=2^k に対して 2n-th root を探索してテーブル生成
     pub fn with_params(n: usize) -> Option<Self> {
         if !n.is_power_of_two() {
             return None;
@@ -38,6 +38,7 @@ impl GoldilocksNttTable {
 
     #[inline(always)]
     pub fn q(&self) -> u64 { self.q }
+
     #[inline(always)]
     pub fn size(&self) -> usize { self.n }
 
@@ -46,20 +47,25 @@ impl GoldilocksNttTable {
         let n = self.n;
         let mut half = n;
         let mut step = 1;
+
         while step < n {
             half >>= 1;
             for i in 0..step {
                 let w = self.fwd_twid[step + i];
                 let base = 2 * i * half;
-                unsafe {
-                    let a_ptr = a.as_mut_ptr();
-                    for j in 0..half {
-                        let idx = base + j;
-                        let u = *a_ptr.add(idx);
-                        let tv = *a_ptr.add(idx + half);
-                        let v = mul(tv, w);
-                        *a_ptr.add(idx) = add(u, v);
-                        *a_ptr.add(idx + half) = sub(u, v);
+                let end = base + half;
+
+                for j in base..end {
+                    let u  = unsafe { *a.get_unchecked(j) };
+                    let tv = unsafe { *a.get_unchecked(j + half) };
+
+                    let v = mul(tv, w);
+                    let sum_  = add(u, v);
+                    let diff_ = sub(u, v);
+
+                    unsafe {
+                        *a.get_unchecked_mut(j) = sum_;
+                        *a.get_unchecked_mut(j + half) = diff_;
                     }
                 }
             }
@@ -72,26 +78,29 @@ impl GoldilocksNttTable {
         let n = self.n;
         let mut step = n;
         let mut half = 1;
+
         while step > 1 {
-            let halfstep = step / 2;
+            let halfstep = step >> 1;
             for i in 0..halfstep {
                 let w = self.inv_twid[halfstep + i];
                 let base = 2 * i * half;
-                unsafe {
-                    let a_ptr = a.as_mut_ptr();
-                    for j in 0..half {
-                        let idx = base + j;
-                        let u = *a_ptr.add(idx);
-                        let v = *a_ptr.add(idx + half);
-                        let sum_ = add(u, v);
-                        let diff_ = sub(u, v);
-                        let diffm = mul(diff_, w);
-                        *a_ptr.add(idx) = sum_;
-                        *a_ptr.add(idx + half) = diffm;
+                let end = base + half;
+
+                for j in base..end {
+                    let u = unsafe { *a.get_unchecked(j) };
+                    let v = unsafe { *a.get_unchecked(j + half) };
+
+                    let sum_  = add(u, v);
+                    let diff_ = sub(u, v);
+                    let diffm = mul(diff_, w);
+
+                    unsafe {
+                        *a.get_unchecked_mut(j) = sum_;
+                        *a.get_unchecked_mut(j + half) = diffm;
                     }
                 }
             }
-            half *= 2;
+            half <<= 1;
             step = halfstep;
         }
         for x in a.iter_mut() {
@@ -122,9 +131,9 @@ pub fn find_primitive_2n_root_of_unity(n: usize) -> Option<(u64, u64)> {
     for _ in 0..3000 {
         let x = rng.gen_range(1..GOLDILOCKS_P);
         let g = exp(x, exponent);
-        // g^n = p-1  (≡ -1 mod p) かどうか
+        // g^n = p-1  (≡ -1 mod p)
         if exp(g, n as u64) == GOLDILOCKS_P.wrapping_sub(1) {
-            // かつ g^(2n) = 1
+            // g^(2n) = 1
             if exp(g, 2 * (n as u64)) == 1 {
                 return Some((g, inv(g)));
             }

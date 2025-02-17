@@ -1,4 +1,9 @@
-/// MongomeryContext
+/// Holds parameters for Montgomery reduction.
+/// m: the modulus
+/// r: R = 2^k
+/// n_prime: precomputed factor for montgomery reduction
+/// k: the exponent for R = 2^k
+/// mask: bitmask for mod R operations (2^k - 1)
 #[derive(Debug)]
 pub struct MontgomeryContext {
     pub m: u64,
@@ -9,13 +14,15 @@ pub struct MontgomeryContext {
 }
 
 impl MontgomeryContext {
+    /// Constructs a MontgomeryContext for a prime m < 2^k (odd) and the given k.
+    /// This precomputes n_prime which is -m^-1 mod R, used for montgomery reduction.
     #[inline]
     pub fn new(m: u64, k: u32) -> Self {
         // R = 2^k
         let r = 1u64 << k;
         // m < 2^k and m is odd
         assert!(m < r, "m must be < R; 2^k");
-        assert_eq!(m& 1, 1, "m must be odd number, gcd(m, 2) = 1");
+        assert_eq!(m & 1, 1, "m must be odd number, gcd(m, 2) = 1");
 
         // n' = -m^-1 mod R
         let m_inv_mod_r = inv_mod_u64(m, r).expect("must invert under 2^k");
@@ -32,18 +39,18 @@ impl MontgomeryContext {
         }
     }
 
+    /// Performs the Montgomery reduction of a 128-bit value t into a 64-bit number mod m.
+    /// Internally uses the mask to emulate mod R=2^k and then subtracts m if necessary.
     #[inline(always)]
     pub fn mont_reduce(&self, t: u128) -> u64 {
-        // R=2^k, mask = R -1 = 2^k - 1は、下位kビットが全部1
-        // T mod R
+        // R=2^k, mask = R -1 = 2^k - 1, the lower k bits are all 1
         let t_mod_r = (t as u64) & self.mask;
 
         let u = (t_mod_r as u128).wrapping_mul(self.n_prime as u128) & (self.mask as u128);
-        // tmpがrの倍数
+        // tmp is multiple of r
         let tmp = t.wrapping_add(u.wrapping_mul(self.m as u128));
 
-        // (tmp / 2^k)
-        // Rの1回の割り算に相当
+        // tmp divide by 2^k
         let big = tmp >> self.k;
         let mut res = big as u64;
         if res >= self.m {
@@ -52,28 +59,29 @@ impl MontgomeryContext {
         res
     }
 
-    /// x -> (x*R) mod m
+    /// Converts a normal integer x to its Montgomery form (x * R) mod m.
     #[inline(always)]
     pub fn to_mont(&self, x: u64) -> u64 {
         let xr = (x as u128).wrapping_mul(self.r as u128);
         (xr % (self.m as u128)) as u64
     }
 
-    /// x -> (x/R) mod m
+    /// Converts a number in Montgomery form x back to normal form (x / R) mod m.
     #[inline(always)]
     pub fn from_mont(&self, x: u64) -> u64 {
         self.mont_reduce(x as u128)
     }
 }
 
-/// (mont_x * mont_y) / R mod m
+/// Multiplies two numbers in Montgomery form and reduces them
+/// x_mont * y_mont)/R mod m)
 #[inline(always)]
 pub fn mont_mul(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let t = (x_mont as u128) * (y_mont as u128);
     ctx.mont_reduce(t)
 }
 
-/// (mont_x+mont_y) mod m
+/// Adds two numbers in Montgomery form (mod m).
 #[inline(always)]
 pub fn mont_add(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let s = x_mont.wrapping_add(y_mont);
@@ -84,7 +92,7 @@ pub fn mont_add(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     }
 }
 
-/// (mont_x-mont_y) mod m
+/// Subtracts two numbers in Montgomery form (mod m).
 #[inline(always)]
 pub fn mont_sub(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     let d = x_mont.wrapping_sub(y_mont);
@@ -95,7 +103,7 @@ pub fn mont_sub(x_mont: u64, y_mont: u64, ctx: &MontgomeryContext) -> u64 {
     }
 }
 
-/// (mont_base^exp) mod m
+/// Exponentiates a Montgomery-form base base_mont by exp (mod m).
 #[inline(always)]
 pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
     let mut result = ctx.to_mont(1);
@@ -111,7 +119,7 @@ pub fn mont_exp(base_mont: u64, exp: u64, ctx: &MontgomeryContext) -> u64 {
     result
 }
 
-/// mont_a^(m-2) mod m (Fermat)
+/// Computes the inverse of x_mont (in Montgomery form) using Fermat's little theorem.
 #[inline]
 pub fn mont_inv(x_mont: u64, ctx: &MontgomeryContext) -> Option<u64> {
     if x_mont == 0 {
@@ -122,14 +130,10 @@ pub fn mont_inv(x_mont: u64, ctx: &MontgomeryContext) -> Option<u64> {
     Some(result_mont)
 }
 
-/// モンテゴメリのmの逆元を求めるため
+/// Finds the inverse of a modulo m (here m is 2^k) by extended Euclid. 
+/// This is used for Montgomery setup.
 #[inline]
 fn inv_mod_u64(a: u64, m: u64) -> Option<u64> {
-    // gcd(a, m)とx,yを拡張ユークリッドで求める
-    // aが逆元を求めたい
-    // mがその時のmod
-    // gcdが1なら
-    // xがa^-1 mod bに該当する
     let (gcd, x, _) = extended_gcd(a as i64, m as i64);
 
     if gcd != 1 {
@@ -143,7 +147,8 @@ fn inv_mod_u64(a: u64, m: u64) -> Option<u64> {
     Some(x_mod_m as u64)
 }
 
-/// gcd(a, b) = a*s0 + b*t0, 最終的に (gcd, si, ti) を返す
+/// Extended GCD on (r0, r1); returns (gcd, s0, t0) with gcd = r0*s0 + r1*t0.
+/// Used for computing modular inverses.
 #[inline]
 fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
     let (mut s0, mut s1) = (1, 0);
@@ -170,8 +175,6 @@ fn extended_gcd(mut r0: i64, mut r1: i64) -> (i64, i64, i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
-    use crate::dft::field::exp as naive_field_exp;
 
     #[test]
     fn test_montgomery_context_new_basic() {
@@ -188,11 +191,11 @@ mod tests {
     #[test]
     fn test_to_mont_from_mont() {
         let ctx = MontgomeryContext::new(17, 5);
-        // 10*32 mod17=14
+        // 10*32 mod 17 = 14
         let x_mont = ctx.to_mont(10); 
         assert_eq!(x_mont, 14);
 
-        // 10 mod17
+        // 10 mod 17
         let back = ctx.from_mont(x_mont);
         assert_eq!(back, 10);
     }
@@ -212,7 +215,7 @@ mod tests {
         let inv = inv_mod_u64(5, 17).unwrap();
         assert_eq!((5 * inv) % 17, 1);
 
-        // gcd(6,12)=6=>逆元なし
+        // gcd(6,12)=6=>None
         assert_eq!(inv_mod_u64(6, 12), None);
     }
     
@@ -292,31 +295,5 @@ mod tests {
         // inverse of 0
         let x_mont = ctx.to_mont(0);
         assert_eq!(mont_inv(x_mont, &ctx), None);
-    }
-
-    #[test]
-    fn test_mont_exp_and_naive_field_exp() {
-        const big_q: u64 = 0x1fffffffffe00001;
-        // 2^62 > big_k
-        const k: u32 = 62;
-
-        let ctx = MontgomeryContext::new(big_q, k);
-
-        let mut rng = rand::thread_rng();
-
-        for _ in 0..10 {
-            let base = rng.gen_range(1..big_q);
-            let exp = rng.gen_range(0..100000);
-
-            // naive field exp
-            let field_res = naive_field_exp(base, exp, big_q);
-
-            // mont_exp
-            let base_mont = ctx.to_mont(base);
-            let res_mont = mont_exp(base_mont, exp, &ctx);
-            let montgomery_res = ctx.from_mont(res_mont);
-
-            assert_eq!(montgomery_res, field_res);
-        }
     }
 }

@@ -4,6 +4,7 @@ use crate::dft::field::{mul, inv, exp, add, sub};
 use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
 use crate::dft::util::{find_primitive_2nth_root_of_unity_64};
 
+/// A structure for performing NTT using Shoup multiplication.
 pub struct ShoupTable {
     /// NTT-friendly prime
     q: u64,
@@ -14,15 +15,20 @@ pub struct ShoupTable {
     /// inverse of psi
     psi_inv: u64,
 
-    /// Bit-reversed twiddle factors, powers of psi (or psi^2)
+    /// Bit-reversed twiddle factors (forward). Each element is (w, w_shoup),
+    /// so we can do (a * w) mod q via Shoup multiplication.
     fwd_twid: Vec<(u64,u64)>,
-    /// same but inverse
+    /// Bit-reversed twiddle factors (inverse)
     inv_twid: Vec<(u64,u64)>,
 
+    /// n^-1 in normal form + its shoup counterpart. 
+    /// Used for final scaling in inverse NTT.
     inv_n: (u64, u64),
 }
 
 impl ShoupTable {
+    /// Creates a default ShoupTable with q = 0x1fffffffffe00001, n = 2^16, and a known 2n-th root of unity.
+    /// It also sets up the (w, w_shoup) pairs in a bit-reversed order.
     #[inline]
     pub fn new() -> Self {
         let q = 0x1fffffffffe00001u64;
@@ -30,9 +36,11 @@ impl ShoupTable {
         let psi = 0x15eb043c7aa2b01fu64;
         let psi_inv = inv(psi, q).expect("cannot invert psi");
 
+        // inv(n) in normal form, then precompute its shoup pair
         let inv_n_val = inv(n as u64, q).expect("cannot invert n");
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
+        // Build bit-reversed tables of twiddle factors, each stored as (w, w_shoup).
         let (mut fwd_twid, mut inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
 
         Self {
@@ -46,7 +54,9 @@ impl ShoupTable {
         }
     }
 
-    /// dynamic params
+    /// Builds a ShoupTable from user-specified prime q and size n,
+    /// automatically finding a suitable 2n-th root of unity.
+    /// Precomputes the (w, w_shoup) pairs for bit-reversed order.
     #[inline]
     pub fn with_params(q: u64, n: usize) -> Option<Self> {
         if !n.is_power_of_two() {
@@ -75,33 +85,34 @@ impl ShoupTable {
         })
     }
 
-    /// query the prime field
     #[inline(always)]
     pub fn q(&self) -> u64 {
         self.q
     }
 
-    /// query the n
     #[inline(always)]
     pub fn size(&self) -> usize {
         self.n
     }
 
+    /// Uses Shoup multiplication for each twiddle-factor multiply.
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u64]) {
         let q = self.q;
         let mut half = self.n;
         let mut step = 1;
+
         while step < self.n {
             half >>= 1;
             for i in 0..step {
                 let (w, w_shoup) = self.fwd_twid[step + i];
-                let base = 2 * i * half; // j1
-                let end = base + half;   // j2+1
-  
+                let base = 2 * i * half;
+                let end = base + half;
+
                 for j in base..end {
                     let u = unsafe { *a.get_unchecked(j) };
                     let tv = unsafe { *a.get_unchecked(j + half) };
+
                     let v = shoup_mul(tv, (w, w_shoup), q);
 
                     let sum_ = add(u, v, q);
@@ -130,6 +141,7 @@ impl ShoupTable {
                 let (w, w_shoup) = self.inv_twid[halfstep + i];
                 let base = 2 * i * half;
                 let end = base + half;
+
                 for j in base..end {
                     let u = unsafe { *a.get_unchecked(j) };
                     let v = unsafe { *a.get_unchecked(j + half) };
@@ -148,7 +160,7 @@ impl ShoupTable {
             step = halfstep;
         }
 
-        // multiply by inv_n
+        // multiply everything by inv_n via Shoup
         for x in a.iter_mut() {
             *x = shoup_mul(*x, (inv_n_val, inv_n_shoup), q);
         }
@@ -156,26 +168,22 @@ impl ShoupTable {
 }
 
 impl DFT<u64> for ShoupTable {
-    /// NTT forward routine
-    ///
-    /// - `a`: vector with each element in range `[0, q)`
     #[inline(always)]
     fn forward_inplace(&self, a: &mut [u64]) {
         self.forward_inplace(a);
     }
 
-    /// NTT backward routine
-    ///
-    /// - `a`: vector with each element in range `[0, q)`
     #[inline(always)]
     fn backward_inplace(&self, a: &mut [u64]) {
         self.backward_inplace(a);
     }
 }
 
-// twidの定義
+/// Builds bit-reversed tables of (w, w_shoup) pairs for Shoup multiplication
 #[inline]
-fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(u64,u64)>, Vec<(u64,u64)>) {
+fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64)
+    -> (Vec<(u64,u64)>, Vec<(u64,u64)>)
+{
     let log_n = n.trailing_zeros();
     let mut fwd = vec![(0u64,0u64); n];
     let mut inv = vec![(0u64,0u64); n];
@@ -183,6 +191,8 @@ fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(
     let mut power_psi = 1u64;
     let mut power_psi_inv = 1u64;
 
+    // Each i: compute psi^i -> (psi^i, shoup_precompute(psi^i)) for forward,
+    // likewise for inverse. Then store them in bit-reversed position.
     for i in 0..n {
         let r = (i as u32).reverse_bits() >> (32 - log_n);
         let ridx = r as usize;

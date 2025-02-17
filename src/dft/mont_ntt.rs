@@ -4,9 +4,9 @@ use crate::dft::mont_field::{
 };
 use crate::dft::field::{mul, exp, inv};
 use rand::Rng;
-
 use crate::dft::util::{find_primitive_2nth_root_of_unity_64, build_bitrev_tables_u64};
 
+/// A structure for performing NTT using Montgomery multiplication.
 pub struct MontTable{
     /// NTT friendly prime
     q: u64,
@@ -17,30 +17,35 @@ pub struct MontTable{
     /// inverse of psi
     psi_inv: u64,
     
-    /// Bit-reversed twiddle factors, powers of psi (or psi^2)
+    /// Bit-reversed twiddle factors
     fwd_twid: Vec<u64>,
     /// same but inverse
     inv_twid: Vec<u64>,
 
-    /// n^-1 mod q in mont form for INTT
+    /// n^-1 mod q in mont form (used for the backward transform)
     inv_n: u64,
 
+    /// Montgomery context for operations mod `q`.
     mont: MontgomeryContext,
 }
 
 impl MontTable {
+    /// Creates a default MontTable with q=0x1fffffffffe00001, n=2^16, and a known 2n-th root of unity.
     #[inline(always)]
     pub fn new() -> Self {
         let q = 0x1fffffffffe00001u64;
         let n =  1<<16;
-        let psi =  0x15eb043c7aa2b01fu64; //2^17th root of unity
+        // 2^17-th root of unity
+        let psi =  0x15eb043c7aa2b01fu64; 
         let psi_inv = inv(psi, q).expect("cannot calc invere of psi");
 
+        // Build bitrev twiddle factors but not in Montgomery form yet
         let (mut fwd_twid, mut inv_twid) = build_bitrev_tables_u64(n, q, psi, psi_inv);
 
         let k: u32 = 62;
         let mont = MontgomeryContext::new(q, k);
 
+        // Convert twiddle factors into Montgomery form
         for x in fwd_twid.iter_mut() {
             *x = mont.to_mont(*x);
         }
@@ -48,6 +53,7 @@ impl MontTable {
             *x = mont.to_mont(*x);
         }
 
+        // Precompute n^-1 in Montgomery form
         let n_mont = mont.to_mont(n as u64);
         let inv_n = mont_inv(n_mont, &mont).expect("cannot calc inverse of n");
 
@@ -63,6 +69,8 @@ impl MontTable {
         }
     }
 
+    /// Builds a MontTable from user-specified prime q and size n,
+    /// automatically finding a suitable 2n-th root of unity.
     #[inline(always)]
     pub fn with_params(q: u64, n: usize) -> Option<Self> {
         if !n.is_power_of_two() {
@@ -82,6 +90,7 @@ impl MontTable {
         }
         let mont = MontgomeryContext::new(q, k);
 
+        // Convert twiddle factors into Montgomery form
         for x in fwd_twid.iter_mut() {
             *x = mont.to_mont(*x);
         }
@@ -110,9 +119,11 @@ impl MontTable {
 
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u64]) {
+        // Convert all a[i] into Montgomery form
         for x in a.iter_mut() {
             *x = self.mont.to_mont(*x);
         }
+
         let mut t = self.n;
         let mut m = 1;
         while m < self.n {
@@ -132,6 +143,7 @@ impl MontTable {
             }
             m <<= 1;
         }
+        // Convert back from Montgomery form
         for x in a.iter_mut() {
             *x = self.mont.from_mont(*x);
         }
@@ -139,9 +151,11 @@ impl MontTable {
 
     #[inline(always)]
     pub fn backward_inplace(&self, a: &mut [u64]) {
+        // Convert all a[i] into Montgomery form
         for x in a.iter_mut() {
             *x = self.mont.to_mont(*x);
         }
+
         let mut t = 1;
         let mut m = self.n;
         while m > 1 {
@@ -162,16 +176,17 @@ impl MontTable {
             t <<= 1;
             m = h;
         }
+        // Multiply each entry by inv_n (Montgomery form)
         for x in a.iter_mut() {
             *x = mont_mul(*x, self.inv_n, &self.mont);
         }
+        // Convert back from Montgomery form
         for x in a.iter_mut() {
             *x = self.mont.from_mont(*x);
         }
     }
 }
 
-// implement DFT<u64> (no changes)
 impl DFT<u64> for MontTable {
     #[inline(always)]
     fn forward_inplace(&self, a: &mut [u64]) {

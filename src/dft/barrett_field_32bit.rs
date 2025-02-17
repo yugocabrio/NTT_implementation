@@ -1,4 +1,5 @@
 use rand::Rng;
+
 #[cfg(target_arch="aarch64")]
 use core::arch::aarch64::{
     uint32x4_t, vld1q_u32, vst1q_u32,
@@ -9,17 +10,19 @@ use core::arch::aarch64::{
 #[cfg(target_arch="aarch64")]
 use core::mem::transmute;
 
+/// Precomputes p_bar = floor((1 << 64) / p) for Barrett reduction.
+/// This helps accelerate (a*b) mod p.
 #[inline(always)]
 pub fn barrett_precompute(p: u32) -> u64 {
     let one = 1u128 << 64;
     (one / (p as u128)) as u64
 }
 
-/// Barrett 乗算
-///   z = a*b (64bit)
-///   q = floor((z * p_bar) >> 64)
-///   r = z - q*p
-///   if r >= p => r - p
+/// Barrett multiplication.
+/// z = a*b (as 64-bit)
+/// q = floor((z * p_bar) >> 64)
+/// r = z - q*p
+/// if r >= p => r -= p
 #[inline(always)]
 pub fn barrett_mul(a: u32, b: u32, p: u32, p_bar: u64) -> u32 {
     let z = (a as u64).wrapping_mul(b as u64);
@@ -42,28 +45,6 @@ pub fn sub(a: u32, b: u32, p: u32) -> u32 {
     if s >= p { s - p } else { s }
 }
 
-/*
-#[inline(always)]
-pub fn add(a: u32, b: u32, p: u32) -> u64 {
-    let (res, carry) = a.overflowing_add(b);
-    let mut s = res;
-    if carry || s >= p {
-        s = s.wrapping_sub(p);
-    }
-    s
-}
-
-#[inline(always)]
-pub fn sub(a: u32, b: u32, p: u32) -> u32 {
-    let (res, borrow) = a.overflowing_sub(b);
-    let mut s = res;
-    if borrow {
-        s = s.wrapping_add(p);
-    }
-    s
-}
-*/
-
 /// (a * b) mod p
 #[inline(always)]
 pub fn mul(a: u32, b: u32, p: u32) -> u32 {
@@ -85,31 +66,67 @@ pub fn exp(mut base: u32, mut e: u32, p: u32) -> u32 {
     r
 }
 
-/// a^(p-2) mod p => inverse  (Fermat)
+/// a^(p-2) mod p
 #[inline(always)]
 pub fn inv(a: u32, p: u32) -> Option<u32> {
     if a == 0 { return None; }
     Some(exp(a, p.wrapping_sub(2), p))
 }
 
+/// Vectorized addition using NEON (lane-wise).
+/// If (u+v) >= p in a given lane, subtract p from that lane.
 #[cfg(target_arch="aarch64")]
 #[inline(always)]
 pub unsafe fn vec_add(u: uint32x4_t, v: uint32x4_t, p_vec: uint32x4_t) -> uint32x4_t {
-    // sum = u + v
+    // sum = u + v (lane-wise)
     let sum = vaddq_u32(u, v);
-    let cmp = vcgeq_u32(sum, p_vec);  // lane-wise: sum>=p => 0xFFFF_FFFF
-    let sub_p = vandq_u32(cmp, p_vec);// laneが1のところだけ p
+    // cmp = (sum >= p_vec)? => 0xFFFF_FFFF if true, else 0
+    let cmp = vcgeq_u32(sum, p_vec);
+    // sub_p = cmp & p_vec => pick 'p' for lanes where sum >= p
+    let sub_p = vandq_u32(cmp, p_vec);
+    // final result: sum - p on lanes that overflowed, otherwise sum
     vsubq_u32(sum, sub_p)
 }
 
+/// Vectorized subtraction using NEON (lane-wise).
+/// If (u < v) in a given lane, add p to that lane for wrap-around.
 #[cfg(target_arch="aarch64")]
 #[inline(always)]
 pub unsafe fn vec_sub(u: uint32x4_t, v: uint32x4_t, p_vec: uint32x4_t) -> uint32x4_t {
-    let cmp = vcgeq_u32(u, v);
+    // diff = u - v (lane-wise)
     let diff = vsubq_u32(u, v);
-    let add_p = vandq_u32(vmvnq_u32(cmp), p_vec);
+    // cmp = (u >= v)? => 0xFFFF_FFFF if true, else 0
+    let cmp = vcgeq_u32(u, v);
+    // vmvnq_u32(cmp) flips bits, lanes where (u < v) become 0xFFFF_FFFF
+    let underflow_mask = vmvnq_u32(cmp);
+    // add_p = underflow_mask & p_vec, pick p for lanes that underflowed
+    let add_p = vandq_u32(underflow_mask, p_vec);
+    // final result: diff + p on lanes that underflowed, otherwise diff
     vaddq_u32(diff, add_p)
 }
+
+// slow
+/*
+#[inline(always)]
+pub fn add(a: u32, b: u32, p: u32) -> u64 {
+    let (res, carry) = a.overflowing_add(b);
+    let mut s = res;
+    if carry || s >= p {
+        s = s.wrapping_sub(p);
+    }
+    s
+}
+
+#[inline(always)]
+pub fn sub(a: u32, b: u32, p: u32) -> u32 {
+    let (res, borrow) = a.overflowing_sub(b);
+    let mut s = res;
+    if borrow {
+        s = s.wrapping_add(p);
+    }
+    s
+}
+*/
 
 #[cfg(test)]
 mod tests {

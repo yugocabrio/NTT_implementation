@@ -8,6 +8,7 @@ use crate::dft::util::{
     build_bitrev_tables_u32,
 };
 
+/// NTT implementation for a 32-bit prime using Barrett reduction in scalar form.
 pub struct BarrettScalarNtt {
     q: u32,
     n: usize,

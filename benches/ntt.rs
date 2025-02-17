@@ -24,7 +24,7 @@ use app::dft::util::pointwise_u64;
 fn bench_ntt_compare(c: &mut Criterion) {
     let mut group = c.benchmark_group("ntt_compare");
 
-    for log_n in 16..=16 {
+    for log_n in 11..=16 {
         let n = 1 << log_n;
 
         // Mont
@@ -136,7 +136,7 @@ fn bench_ntt_compare(c: &mut Criterion) {
 fn bench_ntt_polymul_compare(c: &mut Criterion) {
     let mut group = c.benchmark_group("ntt_polymul_compare");
 
-    for log_n in 16..=16 {
+    for log_n in 11..=16 {
         let n = 1 << log_n;
 
         // Mont poly mul
