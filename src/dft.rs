@@ -8,7 +8,7 @@ pub mod shoup_ntt;
 pub mod goldilocks_field;
 pub mod goldilocks_ntt;
 pub mod barrett_field_32bit;
-pub mod barrett_vectorized_ntt;
+pub mod barrett_vector_ntt;
 pub mod barrett_scalar_ntt;
 pub mod util;
 

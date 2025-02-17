@@ -18,6 +18,7 @@ use plonky2_field::{
 
 /// 61 bit prime (Mont, Shoup, concrete-ntt)
 const PRIME: u64 = 0x1fffffffffe00001;
+use app::dft::util::pointwise_u64;
 
 /// forward benches
 fn bench_ntt_compare(c: &mut Criterion) {
@@ -32,7 +33,6 @@ fn bench_ntt_compare(c: &mut Criterion) {
             group.bench_with_input(bench_id, &n, |b, &_| {
                 b.iter_batched(
                     || {
-                        // 乱数入力
                         let mut rng = rand::thread_rng();
                         let mut data = vec![0u64; n];
                         for x in data.iter_mut() {
@@ -157,17 +157,15 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
                         (a, b)
                     },
                     |(mut a, mut b)| {
-                        mont_table.forward_inplace(&mut a);
-                        mont_table.forward_inplace(&mut b);
+                        let mut fa = a.clone();
+                        let mut fb = b.clone();
+                        mont_table.forward_inplace(&mut fa);
+                        mont_table.forward_inplace(&mut fb);
 
-                        // ポイントワイズ積
-                        for i in 0..n {
-                            let prod = (a[i] as u128 * b[i] as u128) % (PRIME as u128);
-                            a[i] = prod as u64;
-                        }
+                        pointwise_u64(&mut fa, &fb, PRIME);
 
-                        mont_table.backward_inplace(&mut a);
-                        black_box(&a);
+                        mont_table.backward_inplace(&mut fa);
+                        black_box(&fa);
                     },
                     BatchSize::LargeInput,
                 );
@@ -192,15 +190,15 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
                         (a, b)
                     },
                     |(mut a, mut b)| {
-                        shoup_table.forward_inplace(&mut a);
-                        shoup_table.forward_inplace(&mut b);
+                        let mut fa = a.clone();
+                        let mut fb = b.clone();
+                        shoup_table.forward_inplace(&mut fa);
+                        shoup_table.forward_inplace(&mut fb);
 
-                        for i in 0..n {
-                            let prod = (a[i] as u128 * b[i] as u128) % (PRIME as u128);
-                            a[i] = prod as u64;
-                        }
-                        shoup_table.backward_inplace(&mut a);
-                        black_box(&a);
+                        pointwise_u64(&mut fa, &fb, PRIME);
+
+                        shoup_table.backward_inplace(&mut fa);
+                        black_box(&fa);
                     },
                     BatchSize::LargeInput,
                 );
@@ -256,14 +254,12 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
                             (a,b)
                         },
                         |(mut a, mut b)| {
-                            // forward
                             gold_table.forward_inplace(&mut a);
                             gold_table.forward_inplace(&mut b);
 
-                            // pointwise
                             for i in 0..n {
                                 let prod = (a[i] as u128) * (b[i] as u128);
-                                a[i] = reduce128(prod); // goldilocks用の 128->64 还元
+                                a[i] = reduce128(prod);
                             }
 
                             gold_table.backward_inplace(&mut a);
@@ -286,22 +282,19 @@ fn bench_ntt_polymul_compare(c: &mut Criterion) {
                         (coeffs_a, coeffs_b)
                     },
                     |(coeffs_a, coeffs_b)| {
-                        // FFT
                         let poly_a = PolynomialCoeffs { coeffs: coeffs_a };
                         let poly_b = PolynomialCoeffs { coeffs: coeffs_b };
 
                         let vals_a = fft(poly_a);
                         let vals_b = fft(poly_b);
 
-                        // pointwise
                         let mut vals_c = vals_a.values;
                         for i in 0..n {
                             vals_c[i] *= vals_b.values[i];
                         }
 
-                        // iFFT
-                        let _poly_c = ifft(PolynomialValues { values: vals_c });
-                        black_box(_poly_c);
+                        let result = ifft(PolynomialValues { values: vals_c });
+                        black_box(result);
                     },
                     BatchSize::LargeInput,
                 );

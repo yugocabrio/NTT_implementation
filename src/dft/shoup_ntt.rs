@@ -200,11 +200,9 @@ fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> (Vec<(
 mod tests {
     use super::*;
     use crate::dft::DFT;
-    use crate::dft::field::{
-        add as field_add, sub as field_sub, mul as field_mul, exp as field_exp
-    };
     use rand::thread_rng;
     use rand::Rng;
+    use crate::dft::util::{ naive_negacyclic_u64, pointwise_u64 };
 
     #[test]
     fn shoup_forward_backward_small_prime() {
@@ -242,38 +240,6 @@ mod tests {
         assert_eq!(data,orig);
     }
 
-    /// c(x) = a(x)*b(x) (mod x^n + 1).
-    /// (i + j >= n) のとき、c[(i+j) - n] にマイナスを加える
-    pub fn negacyclic_mult(a: &[u64], b: &[u64], q: u64) -> Vec<u64> {
-        let n = a.len();
-        let mut c = vec![0u64; n];
-
-        for i in 0..n {
-            for j in 0..n {
-                // index = i + j
-                let idx = i + j;
-                let product = field_mul(a[i], b[j], q);
-
-                if idx < n {
-                    // c[idx] += a[i]*b[j]
-                    c[idx] = field_add(c[idx], product, q);
-                } else {
-                    // c[idx - n] -= a[i]*b[j]
-                    let wrapped_idx = idx - n;
-                    c[wrapped_idx] = field_sub(c[wrapped_idx], product, q);
-                }
-            }
-        }
-
-        c
-    }
-
-    fn point_multiply(a:&mut[u64],b:&mut[u64],q:u64){
-        for i in 0..a.len(){
-            a[i]=field_mul(a[i],b[i],q);
-        }
-    }
-
     #[test]
     fn shoup_test_ntt_polymul_small_prime() {
         let q = 7681u64;
@@ -290,11 +256,11 @@ mod tests {
             b[i] = rng.gen_range(0..q);
         }
 
-        let result_naive = negacyclic_mult(&a, &b, q);
+        let result_naive = naive_negacyclic_u64(&a, &b, q);
 
         table.forward_inplace(&mut a);
         table.forward_inplace(&mut b);
-        point_multiply(&mut a, &mut b, q);
+        pointwise_u64(&mut a, &mut b, q);
         table.backward_inplace(&mut a);
 
         assert_eq!(a, result_naive);
@@ -315,11 +281,11 @@ mod tests {
             b[i] = rng.gen_range(0..q);
         }
 
-        let result_naive = negacyclic_mult(&a, &b, q);
+        let result_naive = naive_negacyclic_u64(&a, &b, q);
 
         table.forward_inplace(&mut a);
         table.forward_inplace(&mut b);
-        point_multiply(&mut a, &mut b, q);
+        pointwise_u64(&mut a, &mut b, q);
         table.backward_inplace(&mut a);
 
         assert_eq!(a, result_naive);

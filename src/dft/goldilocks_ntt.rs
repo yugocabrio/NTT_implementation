@@ -270,21 +270,7 @@ mod tests {
             b[i] = rng.gen_range(0..GOLDILOCKS_P);
         }
 
-        let c_naive = {
-            let mut c = vec![0u64; n];
-            for i in 0..n {
-                for j in 0..n {
-                    let prod = mul(a[i], b[j]);
-                    let idx = i + j;
-                    if idx < n {
-                        c[idx] = add(c[idx], prod);
-                    } else {
-                        c[idx - n] = sub(c[idx - n], prod);
-                    }
-                }
-            }
-            c
-        };
+        let c_naive = poly_negacyclic_naive(&a, &b);
 
         let mut fa = a.clone();
         let mut fb = b.clone();

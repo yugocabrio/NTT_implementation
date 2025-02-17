@@ -21,9 +21,13 @@ pub struct BarrettScalarNtt {
 
 impl BarrettScalarNtt {
     pub fn with_params(q: u32, n: usize) -> Option<Self> {
-        if !n.is_power_of_two() { return None; }
+        if !n.is_power_of_two() {
+            return None;
+        }
         let two_n = 2*(n as u32);
-        if (q-1) % two_n != 0 { return None; }
+        if (q-1) % two_n != 0 {
+            return None;
+        }
 
         let (psi, psi_inv) = find_primitive_2nth_root_of_unity_32(q, n)?;
         let inv_n_val = inv(n as u32, q)?;
@@ -45,6 +49,7 @@ impl BarrettScalarNtt {
 
     #[inline(always)]
     pub fn q(&self) -> u32 { self.q }
+
     #[inline(always)]
     pub fn size(&self) -> usize { self.n }
 
@@ -154,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_barret_scalar_polymul() {
-        let q= 1062862849;
+        let q= 1062862849u32;
         let n= 8;
         let table= BarrettScalarNtt::with_params(q, n).expect("cannot build");
 
