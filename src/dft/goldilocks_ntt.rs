@@ -148,7 +148,7 @@ pub fn find_primitive_2n_root_of_unity(n: usize) -> Option<(u64, u64)> {
     let exponent = (GOLDILOCKS_P - 1) / two_n;
     let mut rng = rand::thread_rng();
 
-    for _ in 0..3000 {
+    for _ in 0..100 {
         let x = rng.gen_range(1..GOLDILOCKS_P);
         let g = exp(x, exponent);
         // g^n = p-1  (≡ -1 mod p)

@@ -19,7 +19,7 @@ pub fn find_primitive_2nth_root_of_unity_64(p: u64, n: usize) -> Option<(u64, u6
     let exponent = (p - 1) / two_n;
     let mut rng = rand::thread_rng();
 
-    for _ in 0..3000 {
+    for _ in 0..100 {
         let x_rand = rng.gen_range(1..p);
         let g = exp_64(x_rand, exponent, p);
         // g^n = p-1 => -1 mod p
@@ -46,7 +46,7 @@ pub fn find_primitive_2nth_root_of_unity_32(p: u32, n: usize) -> Option<(u32, u3
     let exponent = (p - 1) / two_n;
     let mut rng = rand::thread_rng();
 
-    for _ in 0..3000 {
+    for _ in 0..100 {
         let x = rng.gen_range(1..p);
         let g = exp_32(x, exponent, p);
         let g_n = exp_32(g, n as u32, p);
