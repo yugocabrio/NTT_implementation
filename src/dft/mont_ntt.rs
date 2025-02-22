@@ -136,11 +136,17 @@ impl MontTable {
                 let j2 = j1 + t - 1;
                 let s_mont = self.fwd_twid[m + i];
                 for j in j1..=j2 {
-                    let u = a[j];
-                    let v = mont_mul(a[j + t], s_mont, &self.mont);
+                    let u = unsafe { *a.get_unchecked(j) };
+                    let tv = unsafe { *a.get_unchecked(j + t) };
+                    let v = mont_mul(tv, s_mont, &self.mont);
 
-                    a[j] = mont_add(u, v, &self.mont);
-                    a[j + t] = mont_sub(u, v, &self.mont);
+                    let sum_ = mont_add(u, v, &self.mont);
+                    let diff_ = mont_sub(u, v, &self.mont);
+
+                    unsafe {
+                        *a.get_unchecked_mut(j) = sum_;
+                        *a.get_unchecked_mut(j + t) = diff_;
+                    }
                 }
             }
             m <<= 1;
@@ -167,12 +173,17 @@ impl MontTable {
                 let j2 = j1 + t - 1;
                 let s_mont = self.inv_twid[h + i];
                 for j in j1..=j2 {
-                    let u = a[j];
-                    let v = a[j + t];
+                    let u = unsafe { *a.get_unchecked(j) };
+                    let v = unsafe { *a.get_unchecked(j + t) };
 
-                    a[j] = mont_add(u, v, &self.mont);
-                    let diff = mont_sub(u, v, &self.mont);
-                    a[j + t] = mont_mul(diff, s_mont, &self.mont);
+                    let sum_ = mont_add(u, v, &self.mont);
+                    let diff_ = mont_sub(u, v, &self.mont);
+                    let diff_m = mont_mul(diff_, s_mont, &self.mont);
+
+                    unsafe {
+                        *a.get_unchecked_mut(j) = sum_;
+                        *a.get_unchecked_mut(j + t) = diff_m;
+                    }
                 }
             }
             t <<= 1;
