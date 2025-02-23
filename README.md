@@ -89,6 +89,5 @@ This command runs unit tests for various finite field arithmetic, as well as the
 
 ## TODO
 
-- [ ] Implement vectorized `barrett_mul` with NEON.
 - [ ] Address any warnings from `cargo clippy`.
 - [ ] Apply parallelization to the butterfly algorithm.
