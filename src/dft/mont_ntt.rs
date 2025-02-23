@@ -1,8 +1,7 @@
-use crate::dft::field::{exp, inv, mul};
+use crate::dft::field::inv;
 use crate::dft::mont_field::{mont_add, mont_inv, mont_mul, mont_sub, MontgomeryContext};
 use crate::dft::util::{build_bitrev_tables_u64, find_primitive_2nth_root_of_unity_64};
 use crate::dft::DFT;
-use rand::Rng;
 
 /// A structure for performing NTT using Montgomery multiplication.
 pub struct MontTable {
@@ -214,11 +213,7 @@ impl DFT<u64> for MontTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dft::field::{
-        add as field_add, exp as field_exp, mul as field_mul, sub as field_sub,
-    };
     use crate::dft::util::{naive_negacyclic_u64, pointwise_u64};
-    use crate::dft::DFT;
     use rand::thread_rng;
     use rand::Rng;
 

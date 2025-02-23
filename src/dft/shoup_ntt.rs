@@ -1,8 +1,7 @@
-use crate::dft::field::{add, exp, inv, mul, sub};
+use crate::dft::field::{add, inv, mul, sub};
 use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
 use crate::dft::util::find_primitive_2nth_root_of_unity_64;
 use crate::dft::DFT;
-use rand::Rng;
 
 /// A structure for performing NTT using Shoup multiplication.
 pub struct ShoupTable {
@@ -41,7 +40,7 @@ impl ShoupTable {
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
         // Build bit-reversed tables of twiddle factors, each stored as (w, w_shoup).
-        let (mut fwd_twid, mut inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
+        let (fwd_twid, inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
 
         Self {
             q,
@@ -72,7 +71,7 @@ impl ShoupTable {
         let inv_n_val = inv(n as u64, q)?;
         let inv_n_pair = shoup_precompute(inv_n_val, q);
 
-        let (mut fwd_twid, mut inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
+        let (fwd_twid, inv_twid) = shoup_build_bitrev_tables(q, n, psi, psi_inv);
 
         Some(Self {
             q,

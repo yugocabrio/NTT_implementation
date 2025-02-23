@@ -1,7 +1,6 @@
-use crate::dft::barrett_field_32bit::{add, barrett_mul, barrett_precompute, exp, inv, mul, sub};
+use crate::dft::barrett_field_32bit::{add, barrett_mul, barrett_precompute, inv, sub};
 use crate::dft::util::{build_bitrev_tables_u32, find_primitive_2nth_root_of_unity_32};
 use crate::dft::DFT;
-use rand::Rng;
 
 /// NTT implementation for up to a 32-bit prime using Barrett reduction in scalar form.
 pub struct BarrettScalarNtt {

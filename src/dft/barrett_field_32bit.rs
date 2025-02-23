@@ -1,6 +1,6 @@
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::{
-    uint32x4_t, vaddq_u32, vandq_u32, vcgeq_u32, vdupq_n_u32, vld1q_u32, vmvnq_u32, vst1q_u32,
+    uint32x4_t, vaddq_u32, vandq_u32, vcgeq_u32, vmvnq_u32,
     vsubq_u32, vget_low_u32, vget_high_u32, vgetq_lane_u64, vdup_n_u32, vmull_u32
 };
 
@@ -129,12 +129,14 @@ fn reduce_barrett_64(z: u64, p: u32, p_bar: u64) -> u32 {
 #[cfg(target_arch="aarch64")]
 #[inline(always)]
 pub unsafe fn vec_barrett_mul_scalar(u: uint32x4_t, w: u32, p: u32, p_bar: u64) -> uint32x4_t {
-
+    // wを4 lane
     let w_vec = vdup_n_u32(w);
 
+    // uを上下2レーンに分割
     let u_low  = vget_low_u32(u);
     let u_high = vget_high_u32(u);
 
+    // uint32x2_t × uint32x2_t = uint64x2_t
     let lo_prod = vmull_u32(u_low, w_vec);
     let hi_prod = vmull_u32(u_high, w_vec);
 
@@ -173,6 +175,10 @@ pub fn sub(a: u32, b: u32, p: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use core::arch::aarch64::{
+        uint32x4_t, vdupq_n_u32, vld1q_u32
+    };
 
     #[test]
     fn test_add() {
