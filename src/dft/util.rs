@@ -119,9 +119,9 @@ pub fn naive_negacyclic_u64(a: &[u64], b: &[u64], p: u64) -> Vec<u64> {
     let n = a.len();
     let mut c = vec![0u64; n];
 
-    for i in 0..n {
-        for j in 0..n {
-            let prod = mul_64(a[i], b[j], p);
+    for (i, &ai) in a.iter().enumerate() {
+        for (j, &bj) in b.iter().enumerate() {
+            let prod = mul_64(ai, bj, p);
             let idx = i + j;
 
             // If idx < n, just add to c[idx].
@@ -140,10 +140,12 @@ pub fn naive_negacyclic_u64(a: &[u64], b: &[u64], p: u64) -> Vec<u64> {
 pub fn naive_negacyclic_u32(a: &[u32], b: &[u32], p: u32) -> Vec<u32> {
     let n = a.len();
     let mut c = vec![0u32; n];
-    for i in 0..n {
-        for j in 0..n {
-            let prod = mul_32(a[i], b[j], p);
+
+    for (i, &ai) in a.iter().enumerate() {
+        for (j, &bj) in b.iter().enumerate() {
+            let prod = mul_32(ai, bj, p);
             let idx = i + j;
+
             if idx < n {
                 c[idx] = add_32(c[idx], prod, p);
             } else {
@@ -178,7 +180,6 @@ mod tests {
     #[test]
     fn test_naive_negacyclic_64_simple() {
         let p = 19u64;
-        let n = 4;
         let a = [1u64, 2, 3, 4];
         let b = [2u64, 2, 2, 2];
         let c = naive_negacyclic_u64(&a, &b, p);
