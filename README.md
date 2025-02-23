@@ -66,7 +66,7 @@ Here is a speed comparison of `forward_inplace`.
 
 ### A NTT for 32 bit prime(Neon/SIMD experiment) 
 
-| log_n | `barrett_scalar.rs` (un-optimized add/sub) | `barrett_scalar.rs` (optimized add/sub) | `barrett_vector.rs` (vectorized add/sub) | `concrete_ntt` |
+| log_n | `barrett_scalar_ntt.rs` (un-optimized add/sub) | `barrett_scalar_ntt.rs` (optimized add/sub) | `barrett_vector_ntt.rs` | `concrete_ntt` |
 |-------|-------------------------:|--------------------------:|----------------------:|--------------------:|
 | 11    | 17.583µs                | 10.027µs                  | 10.403µs             | 9.5152µs           |
 | 12    | 37.852µs                | 24.04µs                   | 23.507µs             | 20.331µs           |
