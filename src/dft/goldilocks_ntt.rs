@@ -6,11 +6,15 @@ use rand::Rng;
 pub struct GoldilocksNttTable {
     q: u64,
     n: usize,
-    psi: u64,
-    psi_inv: u64,
     fwd_twid: Vec<u64>,
     inv_twid: Vec<u64>,
     inv_n: u64,
+}
+
+impl Default for GoldilocksNttTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GoldilocksNttTable {
@@ -26,8 +30,6 @@ impl GoldilocksNttTable {
         Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n,
@@ -44,8 +46,6 @@ impl GoldilocksNttTable {
         Some(Self {
             q: GOLDILOCKS_P,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n,
@@ -62,6 +62,8 @@ impl GoldilocksNttTable {
         self.n
     }
 
+    /// # Safety: must have length at least `self.n`.
+    #[allow(clippy::needless_range_loop)]
     #[inline(always)]
     pub fn forward_inplace(&self, a: &mut [u64]) {
         let n = self.n;
@@ -76,6 +78,7 @@ impl GoldilocksNttTable {
                 let end = base + half;
 
                 for j in base..end {
+                    // Safety: j, j+half is within the valid range
                     let u = unsafe { *a.get_unchecked(j) };
                     let tv = unsafe { *a.get_unchecked(j + half) };
 
@@ -83,6 +86,7 @@ impl GoldilocksNttTable {
                     let sum_ = add(u, v);
                     let diff_ = sub(u, v);
 
+                    // Safety: j, j+half is within the valid range
                     unsafe {
                         *a.get_unchecked_mut(j) = sum_;
                         *a.get_unchecked_mut(j + half) = diff_;
@@ -93,6 +97,8 @@ impl GoldilocksNttTable {
         }
     }
 
+    /// # Safety: must have length at least `self.n`.
+    #[allow(clippy::needless_range_loop)]
     #[inline(always)]
     pub fn backward_inplace(&self, a: &mut [u64]) {
         let n = self.n;
@@ -107,6 +113,7 @@ impl GoldilocksNttTable {
                 let end = base + half;
 
                 for j in base..end {
+                    // Safety: j, j+half is within the valid range
                     let u = unsafe { *a.get_unchecked(j) };
                     let v = unsafe { *a.get_unchecked(j + half) };
 
@@ -114,6 +121,7 @@ impl GoldilocksNttTable {
                     let diff_ = sub(u, v);
                     let diffm = mul(diff_, w);
 
+                    // Safety: j, j+half is within the valid range
                     unsafe {
                         *a.get_unchecked_mut(j) = sum_;
                         *a.get_unchecked_mut(j + half) = diffm;
@@ -183,7 +191,6 @@ fn build_bitrev_tables(n: usize, psi: u64, psi_inv: u64) -> (Vec<u64>, Vec<u64>)
 mod tests {
     use super::*;
     use crate::dft::goldilocks_field::{add, mul, sub, GOLDILOCKS_P};
-    use crate::dft::DFT;
     use rand::{thread_rng, Rng};
 
     fn poly_negacyclic_naive(a: &[u64], b: &[u64]) -> Vec<u64> {
@@ -269,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn goldi_test_forward_backward_defaul() {
+    fn goldi_test_forward_backward_default() {
         let table = GoldilocksNttTable::new();
         let n = table.size();
         let mut rng = thread_rng();

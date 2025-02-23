@@ -6,8 +6,6 @@ use crate::dft::DFT;
 pub struct BarrettScalarNtt {
     q: u32,
     n: usize,
-    psi: u32,
-    psi_inv: u32,
     fwd_twid: Vec<u32>,
     inv_twid: Vec<u32>,
     inv_n: u32,
@@ -33,8 +31,6 @@ impl BarrettScalarNtt {
         Some(Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n: inv_n_val,

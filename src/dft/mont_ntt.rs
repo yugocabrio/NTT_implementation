@@ -9,10 +9,6 @@ pub struct MontTable {
     q: u64,
     /// n, the power of 2
     n: usize,
-    /// 2n-th root of unity
-    psi: u64,
-    /// inverse of psi
-    psi_inv: u64,
 
     /// Bit-reversed twiddle factors
     fwd_twid: Vec<u64>,
@@ -24,6 +20,12 @@ pub struct MontTable {
 
     /// Montgomery context for operations mod q.
     mont: MontgomeryContext,
+}
+
+impl Default for MontTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MontTable {
@@ -57,8 +59,6 @@ impl MontTable {
         Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n,
@@ -101,8 +101,6 @@ impl MontTable {
         Some(Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n,

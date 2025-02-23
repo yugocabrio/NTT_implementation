@@ -1,21 +1,16 @@
 use crate::dft::barrett_field_32bit::{
-    add, barrett_mul, barrett_precompute, inv, sub,
-    vec_add, vec_sub, vec_barrett_mul_scalar
+    add, barrett_mul, barrett_precompute, inv, sub, vec_add, vec_barrett_mul_scalar, vec_sub,
 };
 use crate::dft::util::{build_bitrev_tables_u32, find_primitive_2nth_root_of_unity_32};
 use crate::dft::DFT;
 
 #[cfg(target_arch = "aarch64")]
-use core::arch::aarch64::{
-    vdupq_n_u32, vld1q_u32, vst1q_u32,
-};
+use core::arch::aarch64::{vdupq_n_u32, vld1q_u32, vst1q_u32};
 
 /// NTT implementation for p to a 32-bit prime using Barrett reduction and NEON vectorization.
 pub struct BarrettVectorNtt {
     q: u32,
     n: usize,
-    psi: u32,
-    psi_inv: u32,
     fwd_twid: Vec<u32>,
     inv_twid: Vec<u32>,
     inv_n: u32,
@@ -41,8 +36,6 @@ impl BarrettVectorNtt {
         Some(Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n: inv_n_val,

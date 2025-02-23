@@ -3,16 +3,14 @@ use crate::dft::shoup_field::{shoup_mul, shoup_precompute};
 use crate::dft::util::find_primitive_2nth_root_of_unity_64;
 use crate::dft::DFT;
 
+type ShoupTwiddleTables = (Vec<(u64, u64)>, Vec<(u64, u64)>);
+
 /// A structure for performing NTT using Shoup multiplication.
 pub struct ShoupTable {
     /// NTT-friendly prime
     q: u64,
     /// n = power-of-two
     n: usize,
-    /// 2n-th root of unity
-    psi: u64,
-    /// inverse of psi
-    psi_inv: u64,
 
     /// Bit-reversed twiddle factors (forward). Each element is (w, w_shoup),
     /// so we can do (a * w) mod q via Shoup multiplication.
@@ -23,6 +21,12 @@ pub struct ShoupTable {
     /// n^-1 in normal form + its shoup counterpart.
     /// Used for final scaling in inverse NTT.
     inv_n: (u64, u64),
+}
+
+impl Default for ShoupTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ShoupTable {
@@ -45,8 +49,6 @@ impl ShoupTable {
         Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n: inv_n_pair,
@@ -76,8 +78,6 @@ impl ShoupTable {
         Some(Self {
             q,
             n,
-            psi,
-            psi_inv,
             fwd_twid,
             inv_twid,
             inv_n: inv_n_pair,
@@ -179,12 +179,7 @@ impl DFT<u64> for ShoupTable {
 
 /// Builds bit-reversed tables of (w, w_shoup) pairs for Shoup multiplication
 #[inline]
-fn shoup_build_bitrev_tables(
-    q: u64,
-    n: usize,
-    psi: u64,
-    psi_inv: u64,
-) -> (Vec<(u64, u64)>, Vec<(u64, u64)>) {
+fn shoup_build_bitrev_tables(q: u64, n: usize, psi: u64, psi_inv: u64) -> ShoupTwiddleTables {
     let log_n = n.trailing_zeros();
     let mut fwd = vec![(0u64, 0u64); n];
     let mut inv = vec![(0u64, 0u64); n];
@@ -192,8 +187,6 @@ fn shoup_build_bitrev_tables(
     let mut power_psi = 1u64;
     let mut power_psi_inv = 1u64;
 
-    // Each i: compute psi^i -> (psi^i, shoup_precompute(psi^i)) for forward,
-    // likewise for inverse. Then store them in bit-reversed position.
     for i in 0..n {
         let r = (i as u32).reverse_bits() >> (32 - log_n);
         let ridx = r as usize;
@@ -211,7 +204,6 @@ fn shoup_build_bitrev_tables(
 mod tests {
     use super::*;
     use crate::dft::util::{naive_negacyclic_u64, pointwise_u64};
-    use crate::dft::DFT;
     use rand::thread_rng;
     use rand::Rng;
 
