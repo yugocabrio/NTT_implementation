@@ -1,5 +1,6 @@
 use crate::dft::barrett_field_32bit::{
-    add, barrett_mul, barrett_precompute, exp, inv, mul, sub, vec_add, vec_sub,
+    add, barrett_mul, barrett_precompute, exp, inv, mul, sub,
+    vec_add, vec_sub, vec_barrett_mul_scalar
 };
 use crate::dft::util::{build_bitrev_tables_u32, find_primitive_2nth_root_of_unity_32};
 use crate::dft::DFT;
@@ -107,14 +108,7 @@ impl BarrettVectorNtt {
                     // load from a[j+half..]
                     let tv_vec = vld1q_u32(a.as_ptr().add(j + half));
 
-                    // TODO: Make Vectorized Barrett_mul.
-                    // convert tv to v using barrett_mul (scalar for each lane)
-                    let tv_arr: [u32; 4] = core::mem::transmute(tv_vec);
-                    let mut v_arr = [0u32; 4];
-                    for k in 0..4 {
-                        v_arr[k] = barrett_mul(tv_arr[k], w, q, p_bar);
-                    }
-                    let v_vec: uint32x4_t = core::mem::transmute(v_arr);
+                    let v_vec = vec_barrett_mul_scalar(tv_vec, w, q, p_bar);
 
                     // lane-wise add/sub (mod p) using vec_add / vec_sub
                     let sum_vec = vec_add(u_vec, v_vec, p_vec);
@@ -173,13 +167,7 @@ impl BarrettVectorNtt {
                     let sum_vec = vec_add(u_vec, tv_vec, p_vec);
                     let tmp_diff_vec = vec_sub(u_vec, tv_vec, p_vec);
 
-                    // TODO: Make Vectorized Barrett_mul.
-                    let diff_arr: [u32; 4] = core::mem::transmute(tmp_diff_vec);
-                    let mut diffm_arr = [0u32; 4];
-                    for k in 0..4 {
-                        diffm_arr[k] = barrett_mul(diff_arr[k], w, q, p_bar);
-                    }
-                    let diffm_vec: uint32x4_t = core::mem::transmute(diffm_arr);
+                    let diffm_vec = vec_barrett_mul_scalar(tmp_diff_vec, w, q, p_bar);
 
                     vst1q_u32(a.as_mut_ptr().add(j), sum_vec);
                     vst1q_u32(a.as_mut_ptr().add(j + half), diffm_vec);
@@ -227,8 +215,6 @@ impl DFT<u32> for BarrettVectorNtt {
 mod tests {
     use super::*;
     use crate::dft::util::{naive_negacyclic_u32, pointwise_u32};
-    use crate::dft::DFT;
-
     use rand::thread_rng;
     use rand::Rng;
 

@@ -1,7 +1,7 @@
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::{
     uint32x4_t, vaddq_u32, vandq_u32, vcgeq_u32, vdupq_n_u32, vld1q_u32, vmvnq_u32, vst1q_u32,
-    vsubq_u32,
+    vsubq_u32, vget_low_u32, vget_high_u32, vgetq_lane_u64, vdup_n_u32, vmull_u32
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -114,6 +114,37 @@ pub unsafe fn vec_sub(u: uint32x4_t, v: uint32x4_t, p_vec: uint32x4_t) -> uint32
     let add_p = vandq_u32(underflow_mask, p_vec);
     // final result: diff + p on lanes that underflowed, otherwise diff
     vaddq_u32(diff, add_p)
+}
+
+// reduce for  max 64 bit z
+#[cfg(target_arch="aarch64")]
+#[inline(always)]
+fn reduce_barrett_64(z: u64, p: u32, p_bar: u64) -> u32 {
+    let q = ((z as u128).wrapping_mul(p_bar as u128) >> 64) as u64;
+    let r = z.wrapping_sub(q.wrapping_mul(p as u64)) as u32;
+    if r >= p { r - p } else { r }
+}
+
+/// (u[i] * w) mod p
+#[cfg(target_arch="aarch64")]
+#[inline(always)]
+pub unsafe fn vec_barrett_mul_scalar(u: uint32x4_t, w: u32, p: u32, p_bar: u64) -> uint32x4_t {
+
+    let w_vec = vdup_n_u32(w);
+
+    let u_low  = vget_low_u32(u);
+    let u_high = vget_high_u32(u);
+
+    let lo_prod = vmull_u32(u_low, w_vec);
+    let hi_prod = vmull_u32(u_high, w_vec);
+
+    let mut out_arr = [0u32;4];
+    out_arr[0] = reduce_barrett_64(vgetq_lane_u64::<0>(lo_prod), p, p_bar);
+    out_arr[1] = reduce_barrett_64(vgetq_lane_u64::<1>(lo_prod), p, p_bar);
+    out_arr[2] = reduce_barrett_64(vgetq_lane_u64::<0>(hi_prod), p, p_bar);
+    out_arr[3] = reduce_barrett_64(vgetq_lane_u64::<1>(hi_prod), p, p_bar);
+
+    transmute(out_arr)
 }
 
 // slow
@@ -231,6 +262,25 @@ mod tests {
             let diff_arr: [u32; 4] = transmute(diff_vec);
 
             assert_eq!(diff_arr, [12, 12, 10, 12]);
+        }
+    }
+
+    #[test]
+    fn test_vec_barrett_mul() {
+        #[cfg(target_arch="aarch64")]
+        unsafe {
+            let p = 17u32;
+            let p_bar = barrett_precompute(p);
+
+            let a_arr = [1u32, 8u32, 16u32, 10u32];
+            let w = 9u32; 
+            let a_vec = transmute::<[u32;4], uint32x4_t>(a_arr);
+
+            let w_vec = vec_barrett_mul_scalar(a_vec, w, p, p_bar);
+            let w_arr: [u32;4] = transmute(w_vec);
+
+            //  (1*9)%17=9, (8*9)=72%17=72-68=4, (16*9)=144%17=8, (10*9)=90%17=5
+            assert_eq!(w_arr, [9, 4, 8, 5]);
         }
     }
 }
